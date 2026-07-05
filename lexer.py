@@ -14,7 +14,7 @@ from enum import Enum, auto
 from typing import Iterator
 
 from keywords import (
-    KEYWORDS, KEYWORD_SET, ONE_CHAR_OPS, TWO_CHAR_OPS, DELIMITERS
+    KEYWORDS, KEYWORD_SET, ONE_CHAR_OPS, TWO_CHAR_OPS, THREE_CHAR_OPS, DELIMITERS
 )
 from errors import (
     err_karakter_tak_dikenal,
@@ -155,6 +155,14 @@ class Lexer:
             # ── Identifier / kata kunci ───────────────────────────────────
             if c.isalpha() or c == '_':
                 yield self._baca_nama()
+                continue
+
+            # ── Operator tiga karakter (longest-match-first) ──────────────
+            tiga = self.source[self.pos: self.pos + 3]
+            if tiga in THREE_CHAR_OPS:
+                tok = Token(TipeToken.OP, tiga, self.baris, self.kolom)
+                self._maju(); self._maju(); self._maju()
+                yield tok
                 continue
 
             # ── Operator dua karakter ─────────────────────────────────────

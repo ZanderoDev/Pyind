@@ -74,10 +74,13 @@ KEYWORDS: dict[str, str] = {
 # Sekumpulan kata kunci (untuk pengecekan cepat O(1))
 KEYWORD_SET: set[str] = set(KEYWORDS.keys())
 
-# Operator dua karakter yang dikenali lexer
+# Operator TIGA karakter — harus dicek lebih dulu di lexer (longest-match-first)
+THREE_CHAR_OPS: set[str] = {"**=", "//="}
+
+# Operator DUA karakter — dicek setelah THREE_CHAR_OPS
 TWO_CHAR_OPS: set[str] = {
     "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=",
-    "//", "**", "->", "<<", ">>", "%=", "**=", "//=",
+    "//", "**", "->", "<<", ">>", "%=",
 }
 
 # Operator satu karakter

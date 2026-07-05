@@ -44,6 +44,38 @@ class TestPenugasan:
         assert stmt["jenis"] == "PenugasanGabungan"
         assert stmt["op"] == "*="
 
+    def test_penugasan_gabungan_pangkat(self):
+        """x **= 3 harus menghasilkan PenugasanGabungan dengan op '**='."""
+        stmt = pertama("x **= 3\n")
+        assert stmt["jenis"] == "PenugasanGabungan"
+        assert stmt["op"] == "**="
+        assert stmt["target"]["nama"] == "x"
+        assert stmt["nilai"]["nilai"] == 3
+
+    def test_penugasan_gabungan_bagi_bulat(self):
+        """x //= 2 harus menghasilkan PenugasanGabungan dengan op '//='."""
+        stmt = pertama("x //= 2\n")
+        assert stmt["jenis"] == "PenugasanGabungan"
+        assert stmt["op"] == "//="
+        assert stmt["target"]["nama"] == "x"
+        assert stmt["nilai"]["nilai"] == 2
+
+    def test_semua_op_gabung_tidak_regresi(self):
+        """Semua operator gabungan harus diparsing dengan benar."""
+        kasus = [
+            ("x += 1\n",  "+="),
+            ("x -= 1\n",  "-="),
+            ("x *= 2\n",  "*="),
+            ("x /= 2\n",  "/="),
+            ("x %= 3\n",  "%="),
+            ("x **= 2\n", "**="),
+            ("x //= 2\n", "//="),
+        ]
+        for source, op_diharapkan in kasus:
+            stmt = pertama(source)
+            assert stmt["jenis"] == "PenugasanGabungan", f"Gagal untuk '{op_diharapkan}'"
+            assert stmt["op"] == op_diharapkan, f"Op salah untuk '{op_diharapkan}': {stmt['op']}"
+
 
 # ── Test ekspresi ─────────────────────────────────────────────────────────────
 

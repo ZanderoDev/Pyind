@@ -164,6 +164,28 @@ class TestOperator:
         tokens = tokenisasi("x += 1")
         assert any(t.nilai == "+=" for t in tokens)
 
+    # ── Operator tiga karakter (regression untuk bug longest-match) ───────────
+
+    def test_op_pangkat_sama_dengan(self):
+        """'**=' harus menjadi SATU token, bukan '**' + '='."""
+        tokens = tokenisasi("x **= 3")
+        nilai = nilai_saja(tokens)
+        assert "**=" in nilai, f"Token '**=' tidak ditemukan; dapat: {nilai}"
+        assert "=" not in nilai, f"'=' muncul sebagai token terpisah: {nilai}"
+
+    def test_op_bagi_bulat_sama_dengan(self):
+        """'//=' harus menjadi SATU token, bukan '//' + '='."""
+        tokens = tokenisasi("x //= 2")
+        nilai = nilai_saja(tokens)
+        assert "//=" in nilai, f"Token '//=' tidak ditemukan; dapat: {nilai}"
+        assert "=" not in nilai, f"'=' muncul sebagai token terpisah: {nilai}"
+
+    def test_op_dua_karakter_tidak_regresi(self):
+        """Operator 2-karakter yang sudah ada harus tetap benar."""
+        for op in ["+=", "-=", "*=", "/=", "%=", "**", "//"]:
+            tokens = tokenisasi(f"x {op} 1")
+            assert any(t.nilai == op for t in tokens), f"Token '{op}' hilang"
+
     def test_penugasan(self):
         tokens = tokenisasi("x = 5")
         # Harus ada OP '='

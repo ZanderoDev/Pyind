@@ -1,0 +1,151 @@
+# Contoh 3: Loop dan Fungsi — fitur iterasi lengkap
+# Jalankan: python main.py jalankan contoh/loop_dan_fungsi.pyind
+
+cetak("╔══════════════════════════════════════╗")
+cetak("║   DEMO LOOP DAN FUNGSI — PYIND      ║")
+cetak("╚══════════════════════════════════════╝")
+
+# ── 1. Loop FOR dengan range ──────────────────────────────────────────────────
+
+cetak("\n[1] Loop untuk dengan rentang")
+untuk i dalam rentang(1, 6):
+    cetak("  Iterasi ke-" + teks(i))
+
+# ── 2. Loop FOR dengan list ───────────────────────────────────────────────────
+
+cetak("\n[2] Iterasi daftar buah")
+buah = ["apel", "mangga", "jeruk", "pisang", "durian"]
+untuk b dalam buah:
+    cetak("  Buah:", b)
+
+# ── 3. Loop WHILE dengan break ────────────────────────────────────────────────
+
+cetak("\n[3] Cari angka prima pertama > 10")
+n = 11
+
+fungsi adalah_prima(num):
+    """Cek apakah num adalah bilangan prima."""
+    jika num < 2:
+        kembali salah
+    untuk i dalam rentang(2, bilangan(num ** 0.5) + 1):
+        jika num % i == 0:
+            kembali salah
+    kembali benar
+
+selama benar:
+    jika adalah_prima(n):
+        cetak("  Prima pertama > 10:", n)
+        hentikan
+    n += 1
+
+# ── 4. Nested loop ────────────────────────────────────────────────────────────
+
+cetak("\n[4] Tabel perkalian 3x3")
+untuk baris dalam rentang(1, 4):
+    untuk kolom dalam rentang(1, 4):
+        hasil = baris * kolom
+        cetak(teks(baris) + " x " + teks(kolom) + " = " + teks(hasil))
+
+# ── 5. Loop dengan continue ───────────────────────────────────────────────────
+
+cetak("\n[5] Angka ganjil dari 1–10")
+untuk i dalam rentang(1, 11):
+    jika i % 2 == 0:
+        lanjut
+    cetak(" ", i, end=" ")
+cetak()  # baris baru
+
+# ── 6. Fungsi dengan *args ────────────────────────────────────────────────────
+
+cetak("\n[6] Fungsi penjumlahan variadik")
+
+fungsi jumlahkan(*angka):
+    """Menjumlahkan semua angka yang diberikan."""
+    total = 0
+    untuk a dalam angka:
+        total += a
+    kembali total
+
+cetak("  Jumlah(1,2,3)   =", jumlahkan(1, 2, 3))
+cetak("  Jumlah(1..10)   =", jumlahkan(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+
+# ── 7. Higher-order function ──────────────────────────────────────────────────
+
+cetak("\n[7] Higher-order: terapkan fungsi ke daftar")
+
+fungsi terapkan(fungsi_f, daftar_data):
+    """Terapkan fungsi_f ke setiap elemen daftar_data."""
+    hasil = []
+    untuk item dalam daftar_data:
+        hasil.append(fungsi_f(item))
+    kembali hasil
+
+fungsi kuadrat(x):
+    kembali x * x
+
+fungsi mutlak(x):
+    jika x < 0:
+        kembali -x
+    kembali x
+
+angka = [1, -2, 3, -4, 5]
+cetak("  Asli    :", angka)
+cetak("  Kuadrat :", terapkan(kuadrat, angka))
+cetak("  Mutlak  :", terapkan(mutlak, angka))
+
+# ── 8. Fungsi generasi Fibonacci ─────────────────────────────────────────────
+
+cetak("\n[8] Deret Fibonacci (10 pertama)")
+
+fungsi fibonacci(n):
+    """Hasilkan list n bilangan Fibonacci pertama."""
+    deret = []
+    a, b = 0, 1
+    untuk _ dalam rentang(n):
+        deret.append(a)
+        a, b = b, a + b
+    kembali deret
+
+fib = fibonacci(10)
+cetak("  Fibonacci:", fib)
+
+# ── 9. Kelas dengan loop internal ────────────────────────────────────────────
+
+cetak("\n[9] Kelas Tumpukan (Stack)")
+
+kelas Tumpukan:
+    """Implementasi struktur data tumpukan (LIFO)."""
+
+    fungsi __init__(diri):
+        diri.data = []
+
+    fungsi dorong(diri, item):
+        """Tambahkan item ke atas tumpukan."""
+        diri.data.append(item)
+
+    fungsi keluarkan(diri):
+        """Ambil item dari atas tumpukan."""
+        jika diri.kosong():
+            cetak("  Tumpukan kosong!")
+            kembali kosong
+        kembali diri.data.pop()
+
+    fungsi kosong(diri):
+        kembali panjang(diri.data) == 0
+
+    fungsi ukuran(diri):
+        kembali panjang(diri.data)
+
+# Gunakan tumpukan
+t = Tumpukan()
+untuk nilai dalam [10, 20, 30, 40, 50]:
+    t.dorong(nilai)
+    cetak("  Dorong:", nilai, "| Ukuran:", t.ukuran())
+
+cetak("  --- Keluarkan semua ---")
+selama bukan t.kosong():
+    cetak("  Keluar:", t.keluarkan())
+
+cetak("\n╔══════════════════════════════════════╗")
+cetak("║         SELESAI — Pyind ✓           ║")
+cetak("╚══════════════════════════════════════╝")

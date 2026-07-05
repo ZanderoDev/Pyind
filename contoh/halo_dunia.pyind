@@ -1,0 +1,40 @@
+# Contoh 1: Halo Dunia — program pertama Pyind
+# Jalankan: python main.py jalankan contoh/halo_dunia.pyind
+
+# Cetak pesan sambutan
+cetak("Halo, Dunia!")
+
+# Variabel dan string
+nama = "Budi"
+cetak("Nama saya:", nama)
+
+# Kondisi sederhana
+umur = 20
+jika umur >= 18:
+    cetak("Anda sudah dewasa.")
+jika_tidak umur >= 13:
+    cetak("Anda seorang remaja.")
+lainnya:
+    cetak("Anda masih anak-anak.")
+
+# Operasi dasar
+a = 10
+b = 3
+cetak("Penjumlahan:", a + b)
+cetak("Pengurangan:", a - b)
+cetak("Perkalian :", a * b)
+cetak("Pembagian :", a / b)
+cetak("Sisa bagi  :", a % b)
+
+# Boolean dan logika
+aktif = benar
+selesai = salah
+
+jika aktif dan bukan selesai:
+    cetak("Sedang berjalan...")
+
+# Kata kunci dalam string TIDAK ikut diterjemahkan
+pesan = "jika hujan, bawa payung"
+cetak("Pesan:", pesan)
+
+cetak("--- Selesai ---")

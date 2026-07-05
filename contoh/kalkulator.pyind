@@ -1,0 +1,97 @@
+# Contoh 2: Kalkulator Sederhana
+# Jalankan: python main.py jalankan contoh/kalkulator.pyind
+
+# ── Definisi fungsi kalkulator ──────────────────────────────────────────────
+
+fungsi tambah(a, b):
+    """Menjumlahkan dua angka."""
+    kembali a + b
+
+fungsi kurang(a, b):
+    """Mengurangkan b dari a."""
+    kembali a - b
+
+fungsi kali(a, b):
+    """Mengalikan dua angka."""
+    kembali a * b
+
+fungsi bagi(a, b):
+    """Membagi a dengan b. Menangani pembagian dengan nol."""
+    jika b == 0:
+        cetak("Error: Tidak bisa membagi dengan nol!")
+        kembali kosong
+    kembali a / b
+
+fungsi pangkat(a, b):
+    """Menghitung a pangkat b."""
+    kembali a ** b
+
+fungsi modulo(a, b):
+    """Menghitung sisa bagi a dibagi b."""
+    jika b == 0:
+        cetak("Error: Tidak bisa modulo dengan nol!")
+        kembali kosong
+    kembali a % b
+
+# ── Fungsi tampilkan hasil ────────────────────────────────────────────────────
+
+fungsi tampilkan_hasil(operasi, a, b, hasil):
+    """Menampilkan hasil operasi dengan format rapi."""
+    jika hasil == kosong:
+        kembali
+    cetak(operasi + ":", a, "dan", b, "=", hasil)
+
+# ── Program utama ──────────────────────────────────────────────────────────
+
+cetak("=" * 40)
+cetak("   KALKULATOR PYIND")
+cetak("=" * 40)
+
+# Nilai yang akan dihitung
+x = 15
+y = 4
+
+cetak("Nilai x =", x)
+cetak("Nilai y =", y)
+cetak("-" * 40)
+
+tampilkan_hasil("Tambah  ", x, y, tambah(x, y))
+tampilkan_hasil("Kurang  ", x, y, kurang(x, y))
+tampilkan_hasil("Kali    ", x, y, kali(x, y))
+tampilkan_hasil("Bagi    ", x, y, bagi(x, y))
+tampilkan_hasil("Pangkat ", x, y, pangkat(x, y))
+tampilkan_hasil("Modulo  ", x, y, modulo(x, y))
+
+cetak("-" * 40)
+tampilkan_hasil("Bagi nol", x, 0, bagi(x, 0))
+
+# ── Hitung faktorial ──────────────────────────────────────────────────────────
+
+cetak("\n--- Faktorial ---")
+
+fungsi faktorial(n):
+    """Menghitung faktorial secara rekursif."""
+    jika n < 0:
+        cetak("Error: Faktorial tidak berlaku untuk bilangan negatif.")
+        kembali kosong
+    jika n <= 1:
+        kembali 1
+    kembali n * faktorial(n - 1)
+
+untuk n dalam [0, 1, 5, 10]:
+    hasil = faktorial(n)
+    cetak(n, "! =", hasil)
+
+# ── Try/except untuk validasi ─────────────────────────────────────────────────
+
+cetak("\n--- Konversi Angka ---")
+nilai_teks = "123"
+
+coba:
+    angka = bilangan(nilai_teks)
+    cetak("Berhasil dikonversi:", angka, "(tipe:", tipe(angka).__name__ + ")")
+kecuali ValueError:
+    cetak("Gagal mengonversi teks ke angka.")
+
+cetak("=" * 40)
+cetak("Kalkulator selesai.")

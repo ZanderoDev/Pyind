@@ -125,7 +125,7 @@ def cmd_ekspor(args: argparse.Namespace) -> None:
 
 # ── REPL — helpers ────────────────────────────────────────────────────────────
 
-_KATA_KELUAR: frozenset[str] = frozenset({"keluar()", "exit()", "quit()"})
+_KATA_KELUAR: frozenset[str] = frozenset({"keluar()", "exit()", "quit()", "q"})
 
 
 def _baris_membuka_blok(baris: str) -> bool:
@@ -227,14 +227,14 @@ def cmd_repl(_args: object = None) -> None:
         f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     )
     print(f"Pyind v{VERSI} (Python {py_ver})")
-    print("Ketik 'keluar()' atau tekan Ctrl+D untuk keluar.")
+    print("Ketik 'q' atau tekan Ctrl+C untuk keluar.")
 
     ns: dict = {}          # namespace persisten antar perintah
     buffer: list[str] = [] # akumulasi baris untuk blok multi-baris
 
     while True:
         dalam_blok = bool(buffer)
-        prompt_str = "...  " if dalam_blok else ">>> "
+        prompt_str = "... " if dalam_blok else ">>> "
 
         # ── Baca input ────────────────────────────────────────────────────
         try:
@@ -246,10 +246,9 @@ def cmd_repl(_args: object = None) -> None:
                 _flush_buffer(buffer, ns)
             break
         except KeyboardInterrupt:
-            # Ctrl+C — batalkan input saat ini, jangan keluar
-            print("\nKeyboardInterrupt")
-            buffer.clear()
-            continue
+            # Ctrl+C — keluar dari REPL
+            print()
+            break
 
         # ── Periksa perintah keluar ───────────────────────────────────────
         if baris.strip() in _KATA_KELUAR:

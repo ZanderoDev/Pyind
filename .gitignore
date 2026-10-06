@@ -1,0 +1,31 @@
+# ── Cache Python ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Distribusi &kemasan ─────────────────────────────────────────────────────
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ── Lingkungan virtual ─────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Hasil ekspor Pyind ──────────────────────────────────────────────────────
+/hasil/
+keluar*.py
+*_dari_pyind.py
+
+# ── Editor & sistem operasi ────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

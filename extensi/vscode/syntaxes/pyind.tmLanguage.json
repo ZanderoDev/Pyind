@@ -1,0 +1,166 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Pyind",
+  "scopeName": "source.pyind",
+  "version": "1.1.0",
+  "comment": "Dihasilkan oleh extensi/alat/sinkronkan_leksikon.py — jangan diubah manual.",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#decorator"
+    },
+    {
+      "include": "#function-definition"
+    },
+    {
+      "include": "#class-definition"
+    },
+    {
+      "include": "#keywords-exception"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#keywords-yield"
+    },
+    {
+      "include": "#keywords-del"
+    },
+    {
+      "include": "#keywords-logical"
+    },
+    {
+      "include": "#keywords-control"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "name": "comment.line.number-sign.pyind",
+      "begin": "#",
+      "end": "$",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.pyind"
+        }
+      }
+    },
+    "strings": {
+      "patterns": [
+        {
+          "comment": "Triple-quote dengan prefiks rb/br/fr/rf/tr/u",
+          "name": "string.quoted.triple.pyind",
+          "begin": "[bBfFrRtTuU]{0,2}(\"\"\"|''')",
+          "end": "(\\1)"
+        },
+        {
+          "name": "string.quoted.double.pyind",
+          "begin": "[bBfFrRtTuU]{0,2}\\\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.pyind",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.pyind",
+          "begin": "[bBfFrRtTuU]{0,2}'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.pyind",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "comment": "Biner/oktal/heksa, desimal, eksponen, kompleks",
+      "name": "constant.numeric.pyind",
+      "match": "\\b(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[jJ]?\\b"
+    },
+    "decorator": {
+      "match": "(@)\\s*([_\\p{L}][_\\p{L}\\p{N}]*)",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.decorator.pyind"
+        },
+        "2": {
+          "name": "entity.name.function.pyind"
+        }
+      }
+    },
+    "function-definition": {
+      "match": "\\b(fungsi)\\s+([_\\p{L}][_\\p{L}\\p{N}]*)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.pyind"
+        },
+        "2": {
+          "name": "entity.name.function.pyind"
+        }
+      }
+    },
+    "class-definition": {
+      "match": "\\b(kelas)\\s+([_\\p{L}][_\\p{L}\\p{N}]*)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.pyind"
+        },
+        "2": {
+          "name": "entity.name.class.pyind"
+        }
+      }
+    },
+    "keywords-control": {
+      "name": "keyword.control.pyind",
+      "match": "\\b(?:hasilkan_dari|jika_tidak|kembalikan|pernyataan|akhirnya|continue|hasilkan|hentikan|nonlocal|nonlokal|bersama|finally|kecuali|kembali|lainnya|naikkan|sebagai|assert|except|fungsi|global|import|kosong|lambda|lanjut|lewati|return|selama|async|await|benar|break|bukan|class|hapus|impor|kelas|match|raise|salah|tidak|untuk|while|yield|atau|case|coba|dari|elif|else|from|jika|pass|with|and|dan|def|del|for|not|try|as|if|in|is|or)\\b"
+    },
+    "keywords-exception": {
+      "name": "keyword.control.exception.pyind",
+      "match": "\\b(?:pernyataan|akhirnya|kecuali|naikkan|coba)\\b"
+    },
+    "keywords-yield": {
+      "name": "keyword.control.pyind",
+      "match": "\\b(?:hasilkan_dari|hasilkan|yield)\\b"
+    },
+    "keywords-del": {
+      "name": "keyword.control.pyind",
+      "match": "\\b(?:hapus|del)\\b"
+    },
+    "keywords-logical": {
+      "name": "keyword.operator.logical.pyind",
+      "match": "\\b(?:bukan|tidak|atau|dan)\\b"
+    },
+    "constants": {
+      "name": "constant.language.pyind",
+      "match": "\\b(?:kosong|False|benar|salah|None|True)\\b"
+    },
+    "builtins": {
+      "comment": "Boleh juga identifier — warna hanya petunjuk",
+      "name": "support.function.builtin.pyind",
+      "match": "\\b(?:nilai_abs|bilangan|himpunan|masukkan|desimal|panjang|rentang|daftar|jumlah|bulat|cetak|kamus|muter|sebut|teks|tipe|urut)\\b"
+    },
+    "operators": {
+      "name": "keyword.operator.pyind",
+      "match": "\\*\\*=|//=|>>=|<<=|:=|\\.\\.\\.|[+\\-*/%@&|^]=|==|!=|<=|>=|->|//|\\*\\*|<<|>>|\\+=|-=|\\*=|/=|%="
+    }
+  }
+}

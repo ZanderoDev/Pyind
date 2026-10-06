@@ -1,0 +1,27 @@
+{
+  "comments": { "lineComment": "#" },
+  "brackets": [["(", ")"], ["[", "]"], ["{", "}"]],
+  "autoClosingPairs": [
+    { "open": "(", "close": ")" },
+    { "open": "[", "close": "]" },
+    { "open": "{", "close": "}" },
+    { "open": "\"", "close": "\"", "notIn": ["string", "comment"] },
+    { "open": "'", "close": "'", "notIn": ["string", "comment"] }
+  ],
+  "surroundingPairs": [["(", ")"], ["[", "]"], ["{", "}"], ["\"", "\""], ["'", "'"]],
+  "folding": {
+    "markers": {
+      "start": "^\\s*#\\s*region\\b",
+      "end": "^\\s*#\\s*endregion\\b"
+    }
+  },
+  "indentationRules": {
+    "increaseIndentPattern": "^\\s*[^#]*:\\s*(#.*)?$",
+    "decreaseIndentPattern": "^\\s*(lainnya|jika_tidak|kecuali|akhirnya|else|elif|except|finally)\\b.*:\\s*(#.*)?$"
+  },
+  "onEnterRules": [
+    { "beforeText": "^\\s*[^#]*:\\s*(#.*)?$", "action": { "indent": "indent" } },
+    { "beforeText": "^\\s*(lainnya|jika_tidak|kecuali|akhirnya)\\b.*:\\s*(#.*)?$", "action": { "indent": "none" } }
+  ],
+  "wordPattern": "[_\\p{L}][_\\p{L}\\p{N}]*"
+}

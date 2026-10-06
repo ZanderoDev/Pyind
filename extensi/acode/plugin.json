@@ -1,0 +1,13 @@
+{
+  "id": "com.Zandero.pyind",
+  "name": "Pyind Syntax Highlighting",
+  "main": "main.js",
+  "version": "1.1.0",
+  "readme": "readme.md",
+  "icon": "icon.png",
+  "description": "Syntax highlighting untuk file .pyind — transpiler Bahasa Indonesia ke Python.",
+  "keywords": ["pyind", "syntax", "highlighting", "indonesia", "python", "transpiler"],
+  "author": { "name": "Zandero" },
+  "minVersionCode": 950,
+  "price": 0
+}

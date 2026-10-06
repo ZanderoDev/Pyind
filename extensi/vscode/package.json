@@ -1,0 +1,35 @@
+{
+  "name": "pyind-syntax",
+  "displayName": "Pyind Syntax Highlighting",
+  "description": "Syntax highlighting untuk bahasa Pyind (.pyind) — transpiler Bahasa Indonesia ke Python.",
+  "version": "1.1.0",
+  "publisher": "ZanderoDev",
+  "license": "MIT",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "keywords": ["pyind", "indonesia", "bahasa indonesia", "transpiler", "python"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZanderoDev/Pyind.git",
+    "directory": "extensi/vscode"
+  },
+  "bugs": { "url": "https://github.com/ZanderoDev/Pyind/issues" },
+  "homepage": "https://github.com/ZanderoDev/Pyind",
+  "contributes": {
+    "languages": [
+      {
+        "id": "pyind",
+        "aliases": ["Pyind", "pyind"],
+        "extensions": [".pyind"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "pyind",
+        "scopeName": "source.pyind",
+        "path": "./syntaxes/pyind.tmLanguage.json"
+      }
+    ]
+  }
+}

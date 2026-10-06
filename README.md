@@ -6,6 +6,21 @@
 Kode .pyind  →  Lexer  →  Parser  →  AST  →  Transpiler  →  Python
 ```
 
+Setiap tahap punya API berbahasa Indonesia:
+
+```python
+from lexer import Lexer
+from parser import Parser
+from transpiler import Transpiler
+
+tokens = Lexer(source).tokenisasi()
+ast    = Parser(tokens).urai()
+kode   = Transpiler().terjemahkan(ast)
+```
+
+Alias dalam Bahasa Inggris (`tokenize`, `parse`, `transpile`) tetap tersedia
+untuk kompatibilitas.
+
 ---
 
 ## Instalasi
@@ -30,7 +45,7 @@ pyind --versi
 
 ### Persyaratan
 
-- Python 3.7 atau lebih baru
+- Python 3.9 atau lebih baru
 - Git (untuk instalasi otomatis)
 - pytest — hanya untuk menjalankan unit test
 
@@ -48,13 +63,16 @@ Pyind/
 ├── lexer.py       # Tokenizer — teks → token
 ├── parser.py      # Parser   — token → AST
 ├── transpiler.py  # Generator — AST → kode Python
-├── keywords.py    # Peta kata kunci Bahasa Indonesia → Python
-├── errors.py      # Kelas error berbahasa Indonesia
+├── keywords.py    # Leksikon: reserved, kontekstual, dan fungsi bawaan
+├── errors.py      # Kelas error & diagnostik berbahasa Indonesia
 ├── install.sh     # Installer otomatis
+├── docs/
+│   └── bahasa.md  # Referensi bahasa lengkap
 ├── tests/
 │   ├── test_lexer.py
 │   ├── test_parser.py
-│   └── test_transpiler.py
+│   ├── test_transpiler.py
+│   └── test_regresi.py
 └── contoh/
     ├── halo_dunia.pyind       # Contoh 1: Halo Dunia
     ├── kalkulator.pyind       # Contoh 2: Kalkulator
@@ -135,6 +153,8 @@ Blok yang dibuka dengan `:` otomatis masuk ke mode multi-baris. Tekan **Enter ko
 
 ## Kata Kunci yang Didukung
 
+### Kata kunci khusus (tidak boleh jadi nama)
+
 | Bahasa Indonesia  | Python      | Keterangan              |
 |-------------------|-------------|-------------------------|
 | `fungsi`          | `def`       | Definisi fungsi         |
@@ -150,7 +170,6 @@ Blok yang dibuka dengan `:` otomatis masuk ke mode multi-baris. Tekan **Enter ko
 | `hentikan`        | `break`     | Keluar dari loop        |
 | `lanjut`          | `continue`  | Lanjut iterasi          |
 | `lewati`          | `pass`      | Pernyataan kosong       |
-| `lewat`           | `pass`      | Alias `lewati`          |
 | `impor`           | `import`    | Impor modul             |
 | `dari`            | `from`      | Impor dari modul        |
 | `sebagai`         | `as`        | Alias impor             |
@@ -172,6 +191,16 @@ Blok yang dibuka dengan `:` otomatis masuk ke mode multi-baris. Tekan **Enter ko
 | `hapus`           | `del`       | Hapus variabel          |
 | `lambda`          | `lambda`    | Fungsi anonim           |
 | `pernyataan`      | `assert`    | Pernyataan asersi       |
+| `hasilkan`        | `yield`     | Penghasil nilai         |
+| `hasilkan_dari`   | `yield from`| Penghasil dari iterable |
+
+### Fungsi bawaan (boleh jadi identifier)
+
+Nama di bawah ini tetap bisa dipakai sebagai nama variabel selama belum
+diikat ke nilai lain:
+
+| Bahasa Indonesia  | Python      | Keterangan              |
+|-------------------|-------------|-------------------------|
 | `cetak`           | `print`     | Tampilkan output        |
 | `masukkan`        | `input`     | Baca input              |
 | `panjang`         | `len`       | Panjang koleksi         |
@@ -179,10 +208,89 @@ Blok yang dibuka dengan `:` otomatis masuk ke mode multi-baris. Tekan **Enter ko
 | `tipe`            | `type`      | Tipe data               |
 | `bilangan`        | `int`       | Konversi ke bilangan    |
 | `desimal`         | `float`     | Konversi ke desimal     |
-| `teks`            | `str`       | Konversi ke teks        |
+| `teks` / `sebut`  | `str`       | Konversi ke teks        |
 | `daftar`          | `list`      | Tipe list               |
 | `kamus`           | `dict`      | Tipe dictionary         |
 | `himpunan`        | `set`       | Tipe set                |
+| `urut`            | `sorted`    | Urutkan                 |
+| `jumlah`          | `sum`       | Jumlahkan               |
+
+```pyind
+cetak("halo")           # → print("halo")
+
+cetak = fungsi_lain
+cetak("halo")           # → cetak("halo")   alias sudah mati
+```
+
+---
+
+## Fitur Lanjutan
+
+### Fungsi asinkron
+
+```pyind
+async fungsi ambil_data():
+    kembali await permintaan()
+
+async fungsi main():
+    async untuk item dalam aliran():
+        cetak(item)
+    async bersama berkas() sebagai f:
+        lewati
+```
+
+### Dekorator
+
+```pyind
+@cache
+fungsi mahal(x):
+    kembali x * 2
+```
+
+### Penghasil (generator)
+
+```pyind
+fungsi deret(n):
+    untuk i dalam rentang(n):
+        hasilkan i
+    hasilkan_dari sumber_lain
+```
+
+### Penugasan lanjutan
+
+```pyind
+x: int = 5              # penugasan bertanda
+a, *sisa = data         # unpacking berbintang
+jika (n := panjang(a)) > 2:   # walrus
+    cetak(n)
+```
+
+### Parameter modern
+
+```pyind
+fungsi proses(a, b, /, c, *, d=1, **kwargs):
+    """a dan b posisional-only; d keyword-only."""
+    kembali a + b + c + d
+```
+
+### Perbandingan berantai
+
+```pyind
+jika 0 < x < 10 dan x != 5:
+    cetak("dalam rentang")
+```
+
+### Literal lanjutan
+
+```pyind
+besar   = 0xDEAD_BEEF
+besar2  = 0b1010_1010
+besar3  = 1_000_000
+kompleks = 2j
+pola    = rb"\x41"
+```
+
+Rujukan lengkap ada di [`docs/bahasa.md`](docs/bahasa.md).
 
 ---
 
@@ -262,36 +370,55 @@ cetak("jika hujan, bawa payung")
 pytest tests/ -v
 ```
 
+Butuh Python 3.9+ dan pytest (satu-satunya dependensi, hanya untuk test).
+
 ---
 
 ## Arsitektur
 
 ```
 Lexer (lexer.py)
-  Membaca source code karakter per karakter.
-  Menghasilkan token: KATA_KUNCI, NAMA, ANGKA, TEKS, OP, DELIMITER,
-  INDENT, DEDENT, BARIS_BARU, EOF.
-  Longest-match-first: operator tiga karakter (mis. **=) dicek sebelum dua karakter.
-  String literal dijaga utuh — isinya tidak diproses.
+  Analisis leksikal iteratif — memakai loop + generator, tanpa rekursi,
+  jadi program panjang tidak memicu RecursionError.
+  Menghasilkan token: NAMA, KATA_KUNCI, ANGKA, TEKS, BENAR/SALAH/KOSONG,
+  OP, DELIMITER, BARIS_BARU, INDENT, DEDENT, EOF.
+  Operator memakai longest-match-first (3 → 2 → 1 karakter).
+  String & komentar dijaga utuh — isinya tidak pernah diterjemahkan.
+  Bentuk sumber angka & string dipertahankan (0x_1f, 1_000, rb"ab").
+  Indentasi: tab dihitung kelipatan 8 kolom, sama seperti Python.
+  Identifier mengikuti XID_Start / XID_Continue (Unicode valid).
 
 Parser (parser.py)
-  Recursive Descent Parser.
-  Mengonsumsi token dan membangun AST (pohon dict Python).
-  Mendukung: penugasan, if/elif/else, while, for, def, class,
-  try/except/finally, with, import, return, break, continue, pass,
-  lambda, assert, del, global, nonlocal, eksponen kanan-asosiatif, dsb.
+  Recursive descent parser; tiap level operator punya metode sendiri
+  sehingga urutan presedensi terbaca langsung di kode.
+  Menghasilkan AST berupa dict Python dengan kunci "jenis".
+  Nama identifier diambil dari Token.teks_asli sehingga ejaan Bahasa
+  Indonesia tidak berubah jadi padanan Python.
+  Mendukung: penugasan biasa/bertanda/gabungan/bintang/walrus,
+  if/elif/else, while, for, try/except/else/finally, with, import,
+  def, class, dekorator, async/await, yield, lambda, global, nonlocal,
+  perbandingan berantai, komprehensi, slice, parameter posisional-only
+  dan keyword-only, anotasi tipe.
 
 Transpiler (transpiler.py)
-  Menelusuri AST secara rekursif.
-  Menghasilkan kode Python valid dengan indentasi otomatis.
+  Menelusuri AST dan membangkitkan kode Python dengan indentasi otomatis.
+  Resolver simbol memutuskan apakah nama kontekstual masih berarti
+  builtin (cetak → print) atau sudah di-bind (jadi cetak apa adanya).
+  Murni pembangkitan teks: tanpa eval()/exec()/compile() di modul ini.
+
+errors.py
+  Hierarki PyindError dengan kode galat stabil dan cuplikan sumber
+  berikut penunjuk caret.
 
 main.py (CLI)
   Subperintah: jalankan | ekspor | repl
   pyind (tanpa argumen) → langsung masuk REPL.
-  Mengorkestrasi Lexer → Parser → Transpiler → exec().
-```
+  Hanya di CLI/REPL yang dipakai compile()/exec()/eval().
 
----
+docs/bahasa.md
+  Referensi bahasa lengkap: leksikon, literal, presedensi operator,
+  fitur yang didukung dan belum didukung, serta format diagnostik.
+```
 
 ## Lisensi
 

@@ -10,7 +10,7 @@ set -Eeuo pipefail
 REPO_URL="https://github.com/ZanderoDev/Pyind.git"
 INSTALL_DIR="$HOME/.pyind"
 PYTHON_MIN_MAJOR=3
-PYTHON_MIN_MINOR=7
+PYTHON_MIN_MINOR=9
 
 # ── Warna ─────────────────────────────────────────────────────────────────────
 if [ -t 1 ]; then

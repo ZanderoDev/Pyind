@@ -7,6 +7,87 @@ versi mengikuti [Semantic Versioning](https://semver.org/lang/id/).
 
 ---
 
+## [1.1.0] — 2026-10-06
+
+Penyempurnaan mendasar pada lexer, parser, transpiler, dan dokumentasi.
+
+### Ditambahkan
+
+#### API Bahasa Indonesia
+- Metode utama kini berbahasa Indonesia; alias Inggris dipertahankan:
+  - `Lexer.tokenisasi()` (alias `tokenize`)
+  - `Parser.urai()` (alias `parse`)
+  - `Transpiler.terjemahkan()` (alias `transpile`)
+  - fungsi modul `urai(source)` dan `terjemahkan(ast)`
+- `Token.teks_asli` menyimpan ejaan sumber apa adanya, terpisah dari
+  `Token.nilai` yang berisi padanan Python.
+
+#### Leksikon
+- Pemisahan tegas antara kata kunci *reserved*, kata kunci *kontekstual*
+  (soft keyword), dan fungsi bawaan — meniru perilaku Python.
+- Kata kunci kontekstual (`cetak`, `panjang`, `dalam`, …) boleh identifier.
+- Angka: basis biner/oktal/heksadesimal, underscore, eksponen, dan literal
+  kompleks; galat untuk bentuk salah (`0123`, `0x`, `1.2e`, `1__2`, `123abc`).
+- Prefiks string gabungan lengkap: `rb`, `br`, `fr`, `rf`, huruf besar-kecil.
+- Operator `:=`, `>>=`, `<<=`, `&=`, `|=`, `^=`, `@=`, `...` ditambahkan.
+- Identifier Unicode mengikuti XID_Start/XID_Continue.
+- Indentasi tab dihitung kelipatan 8 kolom, sama seperti Python; indentasi
+  pada baris pertama tanpa blok induk kini dilaporkan sebagai galat.
+
+#### Parser
+- Fungsi asinkron: `async fungsi`, `await`, `async untuk`, `async bersama`.
+- Dekorator di atas fungsi dan kelas.
+- Penghasil: `hasilkan` dan `hasilkan_dari` (padanan `yield` / `yield from`).
+- Penugasan bertanda (`x: int = 5`), penugasan berbintang (`a, *b = data`),
+  dan walrus `(n := panjang(a))`.
+- Perbandingan berantai (`0 < x < 10`).
+- Parameter posisional-only (`/`), keyword-only (`*`), dan anotasi tipe
+  termasuk union (`int | str`) serta generik (`daftar[int]`).
+- `with` menerima beberapa item dipisah koma; `raise … from …`didukung.
+- Nama identifier kini dibaca dari `Token.teks_asli`, sehingga ejaan Bahasa
+  Indonesia tidak lagi berubah menjadi padanan Python.
+- Nama literal (`benar`/`salah`/`kosong`) sah sebagai nama fungsi, kelas,
+  parameter, dan atribut — sesuai Python yang mengizinkan `None`/`True`
+  sebagai nama atribut.
+
+#### Transpiler
+- Resolver simbol per-scope: `cetak("x")` menjadi `print("x")` selama
+  `cetak` belum diikat, tetapi menjadi `cetak("x")` setelah di-bind.
+- Bentuk sumber literal dipertahankan: `0x1f`, `1_000`, `rb"ab"` tidak
+  ditulis ulang lewat `repr()`.
+- Slice kosong distinguished dari ekspresi bernilai nol: `a[:]`, `a[0:0]`,
+  `a[::2]`, `a[::0]` semuanya benar.
+- Kurung eksplisit dari sumber dipertahankan agar makna tanda dan urutan
+  evaluasi tidak berubah, mis. `(-2) ** 2`.
+- Indentasi kompatibel Python.
+
+#### Diagnostik
+- `errors.py` diberi kode galat stabil (`E1001`, `E2001`, `E3001`, `E4001`),
+  nama berkas, rentang lokasi, cuplikan sumber, dan penunjuk `^`.
+- Pesan galat lebih spesifik dan menyebut ejaan sumber yang ditemukan.
+
+#### Dokumentasi
+- `docs/bahasa.md` — referensi bahasa lengkap: leksikon, literal,
+  presedensi operator, fitur yang didukung dan belum didukung, serta
+  format diagnostik.
+- README diperbarui: klaim leksikon dan cakupan AST disesuaikan,
+  bagian Fitur Lanjutan dan Arsitektur ditulis ulang.
+
+### Diperbaiki
+- Bug konsumsi token ganda pada daftar, dict, tuple, dan kelas (tanda baca
+  kurung bisa terlewat sehingga galat menyesatkan).
+- Slice bernilai nol tidak lagi salah dianggap kosong.
+- `kelas Turunan(Induk):` gagal diurai karena `(` tidak dikonsumsi.
+- Angka `0b2`, `1__2`, dan bentuk tidak valid lain kini ditolak.
+- String multi-baris dan baris lanjutan dengan `\` ditangani.
+- Operator `**=` dan `//=` tetap satu token (regresi longest-match).
+
+### Changed
+- Persyaratan Python dinaikkan ke **3.9+** (dari 3.7+).
+- API utama proyek kini berbahasa Indonesia; alias Inggris tetap ada.
+
+---
+
 ## [1.0.0] — 2026-07-06
 
 Rilis perdana Pyind — transpiler Bahasa Indonesia ke Python.
@@ -14,10 +95,10 @@ Rilis perdana Pyind — transpiler Bahasa Indonesia ke Python.
 ### Ditambahkan
 
 #### Inti Transpiler
-- **Lexer** (`lexer.py`) — tokenizer rekursif karakter-per-karakter; mendukung 46 kata kunci Bahasa Indonesia, string literal dijaga utuh (tidak diterjemahkan), longest-match-first untuk operator multi-karakter (`**=`, `//=`, dsb.)
-- **Parser** (`parser.py`) — recursive descent parser; membangun AST lengkap; mendukung tuple unpacking, eksponen kanan-asosiatif, serta keyword yang valid sebagai identifier (mis. `fungsi kosong(diri):`)
+- **Lexer** (`lexer.py`) — tokenizer karakter-per-karakter; mengenali leksikon Bahasa Indonesia, string literal dijaga utuh (tidak diterjemahkan), longest-match-first untuk operator multi-karakter (`**=`, `//=`, dsb.)
+- **Parser** (`parser.py`) — recursive descent parser; membangun AST berbentuk `dict`; mendukung tuple unpacking, eksponen kanan-asosiatif, serta nama kontekstual yang valid sebagai identifier (mis. `fungsi kosong(diri):`)
 - **Transpiler** (`transpiler.py`) — traversal AST rekursif; menghasilkan kode Python valid dengan indentasi otomatis; penanganan presedensi operator yang benar untuk `**`
-- **Keywords** (`keywords.py`) — peta 46 kata kunci Indonesia→Python beserta operator satu, dua, dan tiga karakter
+- **Keywords** (`keywords.py`) — leksikon Bahasa Indonesia (reserved, kontekstual, fungsi bawaan) beserta operator satu, dua, dan tiga karakter
 - **Errors** (`errors.py`) — hierarki `PyindError` dengan pesan kesalahan dalam Bahasa Indonesia
 
 #### CLI (`main.py`)
@@ -41,15 +122,14 @@ Rilis perdana Pyind — transpiler Bahasa Indonesia ke Python.
 #### Installer (`install.sh`)
 - Deteksi environment otomatis: **Termux**, **Acode Terminal**, **Linux**
 - Instalasi dependensi via `pkg` (Termux), `apt`, `apk`, `dnf`, atau `pacman`
-- Cek versi Python minimum (3.7+) dengan pesan kesalahan jelas
+- Cek versi Python minimum dengan pesan kesalahan jelas
 - Update otomatis jika Pyind sudah terpasang (`git pull`)
 - Buat symlink global `pyind` di `$PREFIX/bin` (Termux), `/usr/local/bin`, atau `~/.local/bin`
 - Tambah `$BIN_DIR` ke PATH di `.bashrc`, `.bash_profile`, `.zshrc`, dan `.profile`
 
 #### Lainnya
-- **131 unit test** — mencakup Lexer, Parser, dan Transpiler (`pytest tests/ -v`)
+- **Unit test** — mencakup Lexer, Parser, dan Transpiler (`pytest tests/ -v`)
 - **3 file contoh** — `halo_dunia.pyind`, `kalkulator.pyind`, `loop_dan_fungsi.pyind`
-- **VS Code Extension** (`pyind-syntax/`) — syntax highlighting untuk file `.pyind`
 - **Lisensi MIT** — Copyright 2026 Zandero
 
 ---
@@ -84,4 +164,5 @@ Rilis perdana Pyind — transpiler Bahasa Indonesia ke Python.
 
 ---
 
+[1.1.0]: https://github.com/ZanderoDev/Pyind/releases/tag/v1.1.0
 [1.0.0]: https://github.com/ZanderoDev/Pyind/releases/tag/v1.0.0

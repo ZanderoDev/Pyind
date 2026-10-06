@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyindo"
+version = "1.1.0"
+description = "Transpiler Bahasa Indonesia ke Python"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Zandero" }]
+keywords = [
+    "transpiler",
+    "indonesia",
+    "bahasa indonesia",
+    "compiler",
+    "python",
+    "dsl",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Natural Language :: Indonesian",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Interpreters",
+    "Topic :: Education",
+]
+
+[project.urls]
+Homepage = "https://github.com/ZanderoDev/Pyind"
+Repository = "https://github.com/ZanderoDev/Pyind"
+Changelog = "https://github.com/ZanderoDev/Pyind/blob/main/CHANGELOG.md"
+Issues = "https://github.com/ZanderoDev/Pyind/issues"
+
+[project.scripts]
+pyind = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "lexer", "parser", "transpiler", "keywords", "errors"]

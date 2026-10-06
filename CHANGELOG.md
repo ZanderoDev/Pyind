@@ -99,6 +99,13 @@ Penyempurnaan mendasar pada lexer, parser, transpiler, dan dokumentasi.
 - String multi-baris dan baris lanjutan dengan `\` ditangani.
 - Operator `**=` dan `//=` tetap satu token (regresi longest-match).
 
+### PyPI
+- **`pyproject.toml`** — paket bernama `pyindo` dengan entry point
+  `pyind`, sehingga `pip install pyindo` langsung memberi perintah `pyind`
+- **`.github/workflows/publish.yml`** — publish otomatis ke PyPI memakai
+  Trusted Publishing (OIDC), tanpa API token
+- Rilis berikutnya ke PyPI: versi 1.1.0
+
 ### Installer
 - Perbaikan `install.sh`:
   - Baris PATH tidak lagi menumpuk setiap installer dijalankan ulang; duplikat
@@ -148,7 +155,14 @@ Rilis perdana Pyind — transpiler Bahasa Indonesia ke Python.
 - Ctrl+D → eksekusi sisa buffer lalu keluar
 - Error runtime ditampilkan tanpa menutup REPL
 
-#### Installer (`install.sh`)
+#### PyPI
+- **`pyproject.toml`** — paket bernama `pyindo` dengan entry point
+  `pyind`, sehingga `pip install pyindo` langsung memberi perintah `pyind`
+- **`.github/workflows/publish.yml`** — publish otomatis ke PyPI memakai
+  Trusted Publishing (OIDC), tanpa API token
+- Rilis berikutnya ke PyPI: versi 1.1.0
+
+### Installer (`install.sh`)
 - Deteksi environment otomatis: **Termux**, **Acode Terminal**, **Linux**
 - Instalasi dependensi via `pkg` (Termux), `apt`, `apk`, `dnf`, atau `pacman`
 - Cek versi Python minimum dengan pesan kesalahan jelas

@@ -1,0 +1,35 @@
+name: Publish ke PyPI
+
+# Trusted Publishing: GitHub Actions mengautentikasi ke PyPI lewat OIDC,
+# jadi tidak ada API token yang disimpan di repo.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pypi-publish:
+    name: Upload paket ke PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Salin repo
+        uses: actions/checkout@v4
+
+      - name: Siapkan Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bangun paket
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Publish ke PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

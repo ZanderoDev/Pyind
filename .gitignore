@@ -33,3 +33,8 @@ Thumbs.db
 # ── Paket ekstensi hasil build ─────────────────────────────────────────────
 extensi/vscode/*.vsix
 extensi/*.zip
+
+# ── Artefak build paket Python ───────────────────────────────────────────────
+dist/
+build/
+*.egg-info/

@@ -71,11 +71,27 @@ terbuka — jalankan `hash -r` atau buka terminal baru.
 bash install.sh --help     # tampilkan opsi
 ```
 
+### pip
+
+Pyind juga tersedia sebagai paket PyPI bernama `pyindo`:
+
+```bash
+pip install pyindo
+pyind --versi
+```
+
+Perintah `pyind` langsung tersedia di PATH setelah pemasangan, tanpa perlu
+`install.sh`. Alternatifnya:
+
+```bash
+pipx install pyindo     # terisolasi, disarankan
+```
+
 ### Persyaratan
 
 - Python 3.9 atau lebih baru
 - Git (untuk instalasi otomatis)
-- pytest — hanya untuk menjalankan unit test
+- pytest — hanya untuk menjalankan unit test (opsional)
 
 ```bash
 pip install pytest
@@ -94,12 +110,15 @@ Pyind/
 ├── keywords.py    # Leksikon: reserved, kontekstual, dan fungsi bawaan
 ├── errors.py      # Kelas error & diagnostik berbahasa Indonesia
 ├── install.sh     # Installer otomatis
+├── pyproject.toml # Metadata paket PyPI
 ├── docs/
 │   └── bahasa.md  # Referensi bahasa lengkap
 ├── extensi/
 │   ├── vscode/    # Syntax highlighting untuk VS Code
 │   ├── acode/     # Syntax highlighting untuk Acode
 │   └── alat/      # Generator grammar dari keywords.py
+├── .github/workflows/
+│   └── publish.yml  # Publish otomatis ke PyPI
 ├── tests/
 │   ├── test_lexer.py
 │   ├── test_parser.py

@@ -37,7 +37,7 @@ def merah(teks: str) -> str:
 # ── Konstanta ─────────────────────────────────────────────────────────────────
 
 EKSTENSI_PYIND = ".pyind"
-VERSI = "1.0.0"
+VERSI = "1.1.0"
 BANNER = f"Pyind v{VERSI} — Transpiler Bahasa Indonesia ke Python"
 
 
@@ -49,8 +49,8 @@ def proses_transpilasi(source: str) -> str:
     Kembalikan kode Python yang siap dieksekusi.
     """
     tokens = Lexer(source).tokenisasi()
-    ast    = Parser(tokens).parse()
-    kode   = Transpiler().transpile(ast)
+    ast    = Parser(tokens).urai()
+    kode   = Transpiler().terjemahkan(ast)
     return kode
 
 

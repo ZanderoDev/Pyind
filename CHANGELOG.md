@@ -99,7 +99,19 @@ Penyempurnaan mendasar pada lexer, parser, transpiler, dan dokumentasi.
 - String multi-baris dan baris lanjutan dengan `\` ditangani.
 - Operator `**=` dan `//=` tetap satu token (regresi longest-match).
 
-### Changed
+### Installer
+- Perbaikan `install.sh`:
+  - Baris PATH tidak lagi menumpuk setiap installer dijalankan ulang; duplikat
+    dari versi lama dibersihkan otomatis
+  - Baris PATH ditulis ke `.bashrc` **dan** `.profile`, karena shell login
+    membaca `.bash_profile` lalu `.profile`, bukan `.bashrc`
+  - Installer tidak lagi mempercayai PATH sesi berjalan; yang ditulis ke konfigurasi
+    shell sehingga `pyind` langsung bisa dipanggil di terminal baru
+  - Menjalankan dari dalam salinan repo akan menyalin kode itu ke `~/.pyind`
+    tanpa clone ulang
+  - Lokasi instalasi bisa diatur lewat `PYIND_DIR`
+  - Mode baru: `bash install.sh copot` menghapus salinan, symlink, dan baris PATH
+  - `bash install.sh --help` menampilkan opsi
 - Persyaratan Python dinaikkan ke **3.9+** (dari 3.7+).
 - API utama proyek kini berbahasa Indonesia; alias Inggris tetap ada.
 

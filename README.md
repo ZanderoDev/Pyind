@@ -34,13 +34,41 @@ curl -fsSL https://raw.githubusercontent.com/ZanderoDev/Pyind/main/install.sh | 
 atau jika sudah di-clone:
 
 ```bash
+git clone https://github.com/ZanderoDev/Pyind.git
+cd Pyind
 bash install.sh
+```
+
+Menjalankan installer dari dalam salinan repo akan **menyalin** kode itu ke
+`~/.pyind` — tanpa perlu clone ulang dari GitHub. Kalau tidak dijalankan dari
+dalam repo, installer melakukan clone dangkal otomatis.
+
+Untuk memasang ke lokasi lain:
+
+```bash
+PYIND_DIR="$HOME/.local/share/pyind" bash install.sh
 ```
 
 Setelah instalasi, buka terminal baru lalu jalankan:
 
 ```bash
 pyind --versi
+```
+
+### Copot / uninstall
+
+```bash
+bash install.sh copot
+```
+
+Menghapus salinan di `~/.pyind`, symlink `pyind`, dan baris PATH yang
+installer tambahkan. Baris PATH lama mungkin masih aktif di terminal yang
+terbuka — jalankan `hash -r` atau buka terminal baru.
+
+### Perintah lain
+
+```bash
+bash install.sh --help     # tampilkan opsi
 ```
 
 ### Persyaratan

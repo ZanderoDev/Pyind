@@ -8,9 +8,20 @@
 set -Eeuo pipefail
 
 REPO_URL="https://github.com/ZanderoDev/Pyind.git"
-INSTALL_DIR="$HOME/.pyind"
+INSTALL_DIR="${PYIND_DIR:-$HOME/.pyind}"
 PYTHON_MIN_MAJOR=3
 PYTHON_MIN_MINOR=9
+
+# Mode:pasang (bawaan) atau copot
+MODE="pasang"
+
+# Kalau dijalankan dari dalam salinan repo, pakai salinan itu sebagai sumber
+# supaya tidak perlu clone ulang. Contoh:
+#   git clone https://github.com/ZanderoDev/Pyind.git && cd Pyind && bash install.sh
+SUMBER_LOCAL=""
+if [ -f "$PWD/main.py" ] && [ -f "$PWD/lexer.py" ] && [ -f "$PWD/parser.py" ]; then
+    SUMBER_LOCAL="$(cd "$PWD" && pwd)"
+fi
 
 # ── Warna ─────────────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -102,6 +113,51 @@ check_git() {
     info "Git: $(git --version)"
 }
 
+
+# ── Copot / uninstall ─────────────────────────────────────────────────────────
+hapus_path() {
+    local cfg changed=0
+    local configs=("$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile" "$HOME/.bash_profile")
+    for cfg in "${configs[@]}"; do
+        [ -f "$cfg" ] || continue
+        grep -q 'local/bin.*\$PATH' "$cfg" 2>/dev/null || continue
+        if have awk; then
+            local tmp="$cfg.pyind.tmp"
+            awk 'index($0, "local/bin") && index($0, "PATH") { next } { print }' \
+                "$cfg" > "$tmp" && mv "$tmp" "$cfg"
+        fi
+        changed=1
+    done
+    [ "$changed" -eq 1 ] && info "Baris PATH Pyind dibersihkan." || true
+}
+
+copot() {
+    echo
+    printf "%b\n" "${RED}Pyind Uninstaller${RESET}"
+    echo "────────────────────────────────"
+
+    if [ -n "$INSTALL_DIR" ] && [ -e "$INSTALL_DIR" ]; then
+        rm -rf "$INSTALL_DIR"
+        info "Dihapus: $INSTALL_DIR"
+    else
+        info "Tidak ada instalasi di $INSTALL_DIR"
+    fi
+
+    for d in /usr/local/bin "$HOME/.local/bin" "${PREFIX:-}/bin"; do
+        [ -n "$d" ] && [ "$d" != "/bin" ] || continue
+        if [ -L "$d/pyind" ]; then
+            rm -f "$d/pyind"
+            info "Symlink dihapus: $d/pyind"
+        fi
+    done
+
+    hapus_path
+
+    echo
+    printf "Pyind sudah dicopot. Baris PATH di shell mungkin masih memuat PATH lama;\n"
+    printf "buka terminal baru atau jalankan: hash -r\n"
+}
+
 # ── Pilih direktori bin ───────────────────────────────────────────────────────
 choose_bin_dir() {
     if is_termux && [ -n "${PREFIX:-}" ] && [ -d "$PREFIX/bin" ] && [ -w "$PREFIX/bin" ]; then
@@ -117,6 +173,23 @@ choose_bin_dir() {
 
 # ── Clone atau update repo ────────────────────────────────────────────────────
 clone_repo() {
+    if [ -n "$SUMBER_LOCAL" ]; then
+        if [ "$SUMBER_LOCAL" = "$INSTALL_DIR" ]; then
+            info "Meny memakai salinan lokal: $INSTALL_DIR"
+        else
+            info "Menyalin dari repo lokal: $SUMBER_LOCAL"
+            rm -rf "$INSTALL_DIR"
+            mkdir -p "$INSTALL_DIR"
+            # rsync bila ada (lebih cepat), kalau tidak pakai cp
+            if have rsync; then
+                rsync -a --exclude '.git' "$SUMBER_LOCAL/" "$INSTALL_DIR/"
+            else
+                cp -R "$SUMBER_LOCAL/." "$INSTALL_DIR/"
+            fi
+        fi
+        return
+    fi
+
     if [ -d "$INSTALL_DIR/.git" ]; then
         info "Memperbarui Pyind yang sudah ada..."
         git -C "$INSTALL_DIR" pull --ff-only origin main \
@@ -164,32 +237,36 @@ link_global() {
 
 # ── Pastikan BIN_DIR ada di PATH ──────────────────────────────────────────────
 ensure_path() {
-    case ":${PATH}:" in
-        *":${BIN_DIR}:"*) return ;;  # sudah ada di PATH
-    esac
+    # Jangan hanya mempercayai PATH sesi ini: shell yang baru bisa belum
+    # memuat BIN_DIR. Yang penting baris PATH di file konfigurasi shell.
 
     local export_line="export PATH=\"${BIN_DIR}:\$PATH\""
 
-    # Daftar shell config yang mungkin ada
-    local configs=(
-        "$HOME/.bashrc"
-        "$HOME/.bash_profile"
-        "$HOME/.zshrc"
-        "$HOME/.profile"
-    )
+    # Untuk bash, tulis ke .bashrc DAN .profile: shell login membaca
+    # .bash_profile lalu .profile, bukan .bashrc, sehingga .bashrc saja
+    # tidak selalu terbaca.
+    local cfg
+    case "${SHELL:-}" in
+        */zsh)  cfg="$HOME/.zshrc" ;;
+        */bash) cfg="$HOME/.bashrc" ;;
+        *)      cfg="$HOME/.profile" ;;
+    esac
 
-    local added=0
-    for cfg in "${configs[@]}"; do
-        if [ -f "$cfg" ]; then
-            grep -qxF "$export_line" "$cfg" \
-                || { echo "$export_line" >> "$cfg"; added=1; }
+    touch "$cfg"
+    local profile="$HOME/.profile"
+    touch "$profile"
+
+    # Bersihkan baris PATH lama dari installer sebelumnya, lalu tulis satu kali
+    local f
+    for f in "$cfg" "$profile"; do
+        if have awk; then
+            local tmp="$f.pyind.tmp"
+            awk 'index($0, "export PATH=") && index($0, "local/bin") && index($0, "PATH") { next } { print }' \
+                "$f" > "$tmp" && mv "$tmp" "$f"
         fi
+        grep -qxF "$export_line" "$f" || echo "$export_line" >> "$f"
     done
-
-    # Jika tidak ada config yang cocok, buat .profile
-    if [ "$added" -eq 0 ]; then
-        echo "$export_line" >> "$HOME/.profile"
-    fi
+    info "PATH diperbarui di: $cfg"
 }
 
 # ── Verifikasi ────────────────────────────────────────────────────────────────
@@ -216,6 +293,11 @@ main() {
     printf "%b\n" "${GREEN}Pyind Installer${RESET}"
     echo "────────────────────────────────"
 
+    if [ "$MODE" = "copot" ]; then
+        copot
+        return
+    fi
+
     if is_termux; then
         install_termux
     elif is_android; then
@@ -235,4 +317,18 @@ main() {
     verify
 }
 
-main "$@"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        copot|uninstall|hapus|--copot) MODE="copot" ;;
+        pasang|install|"") ;;
+        -h|--help)
+            printf "Penggunaan: bash install.sh [pasang|copot]\n"
+            printf "  pasang   (bawaan) — pasang atau perbarui Pyind\n"
+            printf "  copot    — hapus Pyind, symlink, dan baris PATH\n"
+            exit 0 ;;
+        *) printf "Argumen tidak dikenal: %s\n" "$1" >&2; exit 1 ;;
+    esac
+    shift
+done
+
+main

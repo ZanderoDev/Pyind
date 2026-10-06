@@ -153,31 +153,52 @@ Rilis perdana Pyind — transpiler Bahasa Indonesia ke Python.
 
 ## Kata Kunci yang Didukung (46)
 
-| Indonesia       | Python      | Indonesia    | Python     |
-|-----------------|-------------|--------------|------------|
-| `fungsi`        | `def`       | `impor`      | `import`   |
-| `kelas`         | `class`     | `dari`       | `from`     |
-| `kembali`       | `return`    | `sebagai`    | `as`       |
-| `kembalikan`    | `return`    | `menjadi`    | `as`       |
-| `jika`          | `if`        | `coba`       | `try`      |
-| `jika_tidak`    | `elif`      | `kecuali`    | `except`   |
-| `lainnya`       | `else`      | `akhirnya`   | `finally`  |
-| `untuk`         | `for`       | `naikkan`    | `raise`    |
-| `selama`        | `while`     | `bersama`    | `with`     |
-| `dalam`         | `in`        | `dan`        | `and`      |
-| `hentikan`      | `break`     | `atau`       | `or`       |
-| `lanjut`        | `continue`  | `bukan`      | `not`      |
-| `lewati`        | `pass`      | `tidak`      | `not`      |
-| `lewat`         | `pass`      | `benar`      | `True`     |
-| `global`        | `global`    | `salah`      | `False`    |
-| `nonlokal`      | `nonlocal`  | `kosong`     | `None`     |
-| `hapus`         | `del`       | `cetak`      | `print`    |
-| `lambda`        | `lambda`    | `masukkan`   | `input`    |
-| `pernyataan`    | `assert`    | `panjang`    | `len`      |
-| `bilangan`      | `int`       | `rentang`    | `range`    |
-| `desimal`       | `float`     | `tipe`       | `type`     |
-| `teks`          | `str`       | `daftar`     | `list`     |
-| `himpunan`      | `set`       | `kamus`      | `dict`     |
+- **`fungsi`** — `def`
+  - **`impor`** — `import`
+- **`kelas`** — `class`
+  - **`dari`** — `from`
+- **`kembali`** — `return`
+  - **`sebagai`** — `as`
+- **`kembalikan`** — `return`
+  - **`menjadi`** — `as`
+- **`jika`** — `if`
+  - **`coba`** — `try`
+- **`jika_tidak`** — `elif`
+  - **`kecuali`** — `except`
+- **`lainnya`** — `else`
+  - **`akhirnya`** — `finally`
+- **`untuk`** — `for`
+  - **`naikkan`** — `raise`
+- **`selama`** — `while`
+  - **`bersama`** — `with`
+- **`dalam`** — `in`
+  - **`dan`** — `and`
+- **`hentikan`** — `break`
+  - **`atau`** — `or`
+- **`lanjut`** — `continue`
+  - **`bukan`** — `not`
+- **`lewati`** — `pass`
+  - **`tidak`** — `not`
+- **`lewat`** — `pass`
+  - **`benar`** — `True`
+- **`global`** — `global`
+  - **`salah`** — `False`
+- **`nonlokal`** — `nonlocal`
+  - **`kosong`** — `None`
+- **`hapus`** — `del`
+  - **`cetak`** — `print`
+- **`lambda`** — `lambda`
+  - **`masukkan`** — `input`
+- **`pernyataan`** — `assert`
+  - **`panjang`** — `len`
+- **`bilangan`** — `int`
+  - **`rentang`** — `range`
+- **`desimal`** — `float`
+  - **`tipe`** — `type`
+- **`teks`** — `str`
+  - **`daftar`** — `list`
+- **`himpunan`** — `set`
+  - **`kamus`** — `dict`
 
 ---
 

@@ -17,50 +17,64 @@ transpiler menjadi source Python yang bisa langsung dijalankan.
 Nama berikut tidak boleh dipakai sebagai identifier — persis seperti
 `def`/`if`/`class` di Python:
 
-| Indonesia | Python | Indonesia | Python |
-|---|---|---|---|
-| `fungsi` | `def` | `dan` | `and` |
-| `kelas` | `class` | `atau` | `or` |
-| `impor` | `import` | `bukan` / `tidak` | `not` |
-| `dari` | `from` | `hapus` | `del` |
-| `sebagai` / `menjadi` | `as` | `bersama` | `with` |
-| `kembalikan` / `kembali` | `return` | `global` | `global` |
-| `jika` | `if` | `nonlokal` | `nonlocal` |
-| `jika_tidak` | `elif` | `pernyataan` | `assert` |
-| `lainnya` | `else` | `lambda` | `lambda` |
-| `untuk` | `for` | `hasilkan` | `yield` |
-| `selama` | `while` | `hasilkan_dari` | `yield from` |
-| `hentikan` | `break` | `benar` | `True` |
-| `lanjut` | `continue` | `salah` | `False` |
-| `lewati` | `pass` | `kosong` | `None` |
-| `coba` | `try` | | |
-| `kecuali` | `except` | | |
-| `akhirnya` | `finally` | | |
-| `naikkan` | `raise` | | |
+- **`fungsi`** — `def`
+  - **`dan`** — `and`
+- **`kelas`** — `class`
+  - **`atau`** — `or`
+- **`impor`** — `import`
+  - **`bukan` / `tidak`** — `not`
+- **`dari`** — `from`
+  - **`hapus`** — `del`
+- **`sebagai` / `menjadi`** — `as`
+  - **`bersama`** — `with`
+- **`kembalikan` / `kembali`** — `return`
+  - **`global`** — `global`
+- **`jika`** — `if`
+  - **`nonlokal`** — `nonlocal`
+- **`jika_tidak`** — `elif`
+  - **`pernyataan`** — `assert`
+- **`lainnya`** — `else`
+  - **`lambda`** — `lambda`
+- **`untuk`** — `for`
+  - **`hasilkan`** — `yield`
+- **`selama`** — `while`
+  - **`hasilkan_dari`** — `yield from`
+- **`hentikan`** — `break`
+  - **`benar`** — `True`
+- **`lanjut`** — `continue`
+  - **`salah`** — `False`
+- **`lewati`** — `pass`
+  - **`kosong`** — `None`
+- **`coba`** — `try`
+  - **** — 
+- **`kecuali`** — `except`
+  - **** — 
+- **`akhirnya`** — `finally`
+  - **** — 
+- **`naikkan`** — `raise`
+  - **** — 
 
 ### 1.2 Kata kunci kontekstual (*soft keyword*)
 
 Nama berikut **boleh** dipakai sebagai identifier. Barronya hanya aktif
 selama nama itu belum diikat ke nilai lain di scope tersebut:
 
-| Indonesia | Python |
-|---|---|
-| `cetak` | `print` |
-| `masukkan` | `input` |
-| `panjang` | `len` |
-| `tipe` | `type` |
-| `bilangan` | `int` |
-| `desimal` | `float` |
-| `teks` / `sebut` | `str` |
-| `daftar` | `list` |
-| `kamus` | `dict` |
-| `himpunan` | `set` |
-| `rentang` | `range` |
-| `urut` | `sorted` |
-| `jumlah` | `sum` |
-| `nilai_abs` | `abs` |
-| `bulat` | `round` |
-| `muter` | `iter` |
+- **`cetak`** — `print`
+- **`masukkan`** — `input`
+- **`panjang`** — `len`
+- **`tipe`** — `type`
+- **`bilangan`** — `int`
+- **`desimal`** — `float`
+- **`teks` / `sebut`** — `str`
+- **`daftar`** — `list`
+- **`kamus`** — `dict`
+- **`himpunan`** — `set`
+- **`rentang`** — `range`
+- **`urut`** — `sorted`
+- **`jumlah`** — `sum`
+- **`nilai_abs`** — `abs`
+- **`bulat`** — `round`
+- **`muter`** — `iter`
 
 Cara kerjanya:
 
@@ -166,27 +180,25 @@ pesan = "jika hujan, bawa payung"
 
 ## 3. Presedensi operator
 
-Mengikuti tabel resmi Python, dari yang paling mengikat:
+Mengikuti tabel resmi Python, dari yang paling mengikat ke yang paling longgar:
 
-| Presedensi | Operator |
-|---|---|
-| tertinggi | `()`, `[]`, `.` (grouping, subscript, atribut) |
-| | `await x` |
-| | `**` (mengikat ke **kanan**) |
-| | `+x`, `-x`, `~x` |
-| | `*`, `/`, `//`, `%`, `@` |
-| | `+`, `-` |
-| | `<<`, `>>` |
-| | `&` |
-| | `^` |
-| | `\|` |
-| | `==`, `!=`, `<`, `>`, `<=`, `>=`, `in`, `not in`, `is`, `is not` |
-| | `not x` |
-| | `and` |
-| | `or` |
-| | `a jika b lainnya c` (ekspresi kondisi) |
-| | `lambda` |
-| | `:=` (penugasan ekspresi) |
+1. `()`, `[]`, `.` — grouping, subscript, atribut
+2. `await x`
+3. `**` — mengikat ke kanan
+4. `+x`, `-x`, `~x`
+5. `*`, `/`, `//`, `%`, `@`
+6. `+`, `-`
+7. `<<`, `>>`
+8. `&`
+9. `^`
+10. `|`
+11. `==`, `!=`, `<`, `>`, `<=`, `>=`, `in`, `not in`, `is`, `is not`
+12. `not x`
+13. `and`
+14. `or`
+15. `a jika b lainnya c` — ekspresi kondisi
+16. `lambda`
+17. `:=` — penugasan ekspresi
 
 Operator dengan presedensi sama mengikat ke kiri, kecuali `**` yang ke kanan.
 
@@ -208,27 +220,25 @@ jika 0 < x < 10:
 
 ## 4. Fitur yang didukung
 
-| Fitur | Contoh |
-|---|---|
-| Penugasan | `x = 1`, `x += 1`, `x: int = 1` |
-| Penugasan tuple / bintang | `a, *b = data` |
-| Penugasan ekspresi (walrus) | `jika (n := panjang(a)) > 2:` |
-| Kontrol alur | `jika` / `jika_tidak` / `lainnya` / `selama` / `untuk` / `hentikan` / `lanjut` |
-| Fungsi | `fungsi`, parameter beranotasi, nilai bawaan, `*args`, `**kwargs` |
-| Parameter posisional-only | `fungsi f(a, /, b):` |
-| Parameter keyword-only | `fungsi f(a, *, b):` |
-| Fungsi asinkron | `async fungsi`, `await`, `async untuk`, `async bersama` |
-| Dekorator | `@deco` di atas fungsi/kelas |
-| Penghasil | `hasilkan`, `hasilkan_dari` |
-| Kelas | `kelas`, `induk`, `__init__` |
-| Penanganan galat | `coba` / `kecuali` / `lainnya` / `akhirnya` |
-| Konteks | `bersama … sebagai` |
-| Impor | `impor x`, `dari x impor y`, `sebagai`/`menjadi` |
-| Komprehensi | list, dict, set, generator |
-| Lambda | `lambda x: x + 1` |
-| Slice | penuh, kosong, bertingkat, langkah negatif |
-| Operator walrus | `:=` |
-| Baris lanjutan | `\` di akhir baris |
+- **Penugasan** — `x = 1`, `x += 1`, `x: int = 1`
+- **Penugasan tuple / bintang** — `a, *b = data`
+- **Penugasan ekspresi (walrus)** — `jika (n := panjang(a)) > 2:`
+- **Kontrol alur** — `jika` / `jika_tidak` / `lainnya` / `selama` / `untuk` / `hentikan` / `lanjut`
+- **Fungsi** — `fungsi`, parameter beranotasi, nilai bawaan, `*args`, `**kwargs`
+- **Parameter posisional-only** — `fungsi f(a, /, b):`
+- **Parameter keyword-only** — `fungsi f(a, *, b):`
+- **Fungsi asinkron** — `async fungsi`, `await`, `async untuk`, `async bersama`
+- **Dekorator** — `@deco` di atas fungsi/kelas
+- **Penghasil** — `hasilkan`, `hasilkan_dari`
+- **Kelas** — `kelas`, `induk`, `__init__`
+- **Penanganan galat** — `coba` / `kecuali` / `lainnya` / `akhirnya`
+- **Konteks** — `bersama … sebagai`
+- **Impor** — `impor x`, `dari x impor y`, `sebagai`/`menjadi`
+- **Komprehensi** — list, dict, set, generator
+- **Lambda** — `lambda x: x + 1`
+- **Slice** — penuh, kosong, bertingkat, langkah negatif
+- **Operator walrus** — `:=`
+- **Baris lanjutan** — `\` di akhir baris
 
 ### 4.1 Yang belum didukung
 

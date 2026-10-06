@@ -148,11 +148,9 @@ Blok yang dibuka dengan `:` otomatis masuk ke mode multi-baris. Tekan **Enter ko
 
 ### Pintasan keyboard
 
-| Tombol | Aksi |
-|--------|------|
-| `keluar()` / `exit()` | Keluar dari REPL |
-| Ctrl+D | Keluar dari REPL |
-| Ctrl+C | Batalkan input saat ini (tidak keluar) |
+- **`keluar()` / `exit()`** — Keluar dari REPL
+- **Ctrl+D** — Keluar dari REPL
+- **Ctrl+C** — Batalkan input saat ini (tidak keluar)
 
 ---
 
@@ -160,65 +158,61 @@ Blok yang dibuka dengan `:` otomatis masuk ke mode multi-baris. Tekan **Enter ko
 
 ### Kata kunci khusus (tidak boleh jadi nama)
 
-| Bahasa Indonesia  | Python      | Keterangan              |
-|-------------------|-------------|-------------------------|
-| `fungsi`          | `def`       | Definisi fungsi         |
-| `kelas`           | `class`     | Definisi kelas          |
-| `kembali`         | `return`    | Nilai kembalian         |
-| `kembalikan`      | `return`    | Alias `kembali`         |
-| `jika`            | `if`        | Kondisi                 |
-| `jika_tidak`      | `elif`      | Kondisi lanjutan        |
-| `lainnya`         | `else`      | Kondisi default         |
-| `untuk`           | `for`       | Loop iterasi            |
-| `selama`          | `while`     | Loop kondisi            |
-| `dalam`           | `in`        | Operator keanggotaan    |
-| `hentikan`        | `break`     | Keluar dari loop        |
-| `lanjut`          | `continue`  | Lanjut iterasi          |
-| `lewati`          | `pass`      | Pernyataan kosong       |
-| `impor`           | `import`    | Impor modul             |
-| `dari`            | `from`      | Impor dari modul        |
-| `sebagai`         | `as`        | Alias impor             |
-| `menjadi`         | `as`        | Alias `sebagai`         |
-| `coba`            | `try`       | Blok percobaan          |
-| `kecuali`         | `except`    | Tangkap exception       |
-| `akhirnya`        | `finally`   | Selalu dijalankan       |
-| `naikkan`         | `raise`     | Lempar exception        |
-| `bersama`         | `with`      | Context manager         |
-| `dan`             | `and`       | Operator logika         |
-| `atau`            | `or`        | Operator logika         |
-| `bukan`           | `not`       | Negasi logika           |
-| `tidak`           | `not`       | Alias `bukan`           |
-| `benar`           | `True`      | Nilai boolean           |
-| `salah`           | `False`     | Nilai boolean           |
-| `kosong`          | `None`      | Nilai null              |
-| `global`          | `global`    | Variabel global         |
-| `nonlokal`        | `nonlocal`  | Variabel closure        |
-| `hapus`           | `del`       | Hapus variabel          |
-| `lambda`          | `lambda`    | Fungsi anonim           |
-| `pernyataan`      | `assert`    | Pernyataan asersi       |
-| `hasilkan`        | `yield`     | Penghasil nilai         |
-| `hasilkan_dari`   | `yield from`| Penghasil dari iterable |
+- **`fungsi`** — `def` — Definisi fungsi
+- **`kelas`** — `class` — Definisi kelas
+- **`kembali`** — `return` — Nilai kembalian
+- **`kembalikan`** — `return` — Alias `kembali`
+- **`jika`** — `if` — Kondisi
+- **`jika_tidak`** — `elif` — Kondisi lanjutan
+- **`lainnya`** — `else` — Kondisi default
+- **`untuk`** — `for` — Loop iterasi
+- **`selama`** — `while` — Loop kondisi
+- **`dalam`** — `in` — Operator keanggotaan
+- **`hentikan`** — `break` — Keluar dari loop
+- **`lanjut`** — `continue` — Lanjut iterasi
+- **`lewati`** — `pass` — Pernyataan kosong
+- **`impor`** — `import` — Impor modul
+- **`dari`** — `from` — Impor dari modul
+- **`sebagai`** — `as` — Alias impor
+- **`menjadi`** — `as` — Alias `sebagai`
+- **`coba`** — `try` — Blok percobaan
+- **`kecuali`** — `except` — Tangkap exception
+- **`akhirnya`** — `finally` — Selalu dijalankan
+- **`naikkan`** — `raise` — Lempar exception
+- **`bersama`** — `with` — Context manager
+- **`dan`** — `and` — Operator logika
+- **`atau`** — `or` — Operator logika
+- **`bukan`** — `not` — Negasi logika
+- **`tidak`** — `not` — Alias `bukan`
+- **`benar`** — `True` — Nilai boolean
+- **`salah`** — `False` — Nilai boolean
+- **`kosong`** — `None` — Nilai null
+- **`global`** — `global` — Variabel global
+- **`nonlokal`** — `nonlocal` — Variabel closure
+- **`hapus`** — `del` — Hapus variabel
+- **`lambda`** — `lambda` — Fungsi anonim
+- **`pernyataan`** — `assert` — Pernyataan asersi
+- **`hasilkan`** — `yield` — Penghasil nilai
+- **`hasilkan_dari`** — `yield from` — Penghasil dari iterable
 
 ### Fungsi bawaan (boleh jadi identifier)
 
 Nama di bawah ini tetap bisa dipakai sebagai nama variabel selama belum
 diikat ke nilai lain:
 
-| Bahasa Indonesia  | Python      | Keterangan              |
-|-------------------|-------------|-------------------------|
-| `cetak`           | `print`     | Tampilkan output        |
-| `masukkan`        | `input`     | Baca input              |
-| `panjang`         | `len`       | Panjang koleksi         |
-| `rentang`         | `range`     | Rentang angka           |
-| `tipe`            | `type`      | Tipe data               |
-| `bilangan`        | `int`       | Konversi ke bilangan    |
-| `desimal`         | `float`     | Konversi ke desimal     |
-| `teks` / `sebut`  | `str`       | Konversi ke teks        |
-| `daftar`          | `list`      | Tipe list               |
-| `kamus`           | `dict`      | Tipe dictionary         |
-| `himpunan`        | `set`       | Tipe set                |
-| `urut`            | `sorted`    | Urutkan                 |
-| `jumlah`          | `sum`       | Jumlahkan               |
+- **`cetak`** — `print` — Tampilkan output
+- **`masukkan`** — `input` — Baca input
+- **`panjang`** — `len` — Panjang koleksi
+- **`rentang`** — `range` — Rentang angka
+- **`tipe`** — `type` — Tipe data
+- **`bilangan`** — `int` — Konversi ke bilangan
+- **`desimal`** — `float` — Konversi ke desimal
+- **`teks` / `sebut`** — `str` — Konversi ke teks
+- **`daftar`** — `list` — Tipe list
+- **`kamus`** — `dict` — Tipe dictionary
+- **`himpunan`** — `set` — Tipe set
+- **`urut`** — `sorted` — Urutkan
+- **`jumlah`** — `sum` — Jumlahkan
 
 ```pyind
 cetak("halo")           # → print("halo")

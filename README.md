@@ -429,10 +429,10 @@ docs/bahasa.md
 
 Syntax highlighting untuk file `.pyind`, tersedia untuk dua editor:
 
-| Editor | Paket | Cara pasang |
-|---|---|---|
-| VS Code | `pyind-syntax-1.1.0.vsix` | Extensions → `···` → **Install from VSIX...** |
-| Acode | `Pyind-Acode-Plugin-1.1.0.zip` | Plugin → **Install plugin from file** |
+- **VS Code** — `pyind-syntax-1.1.0.vsix`
+  - Pasang: Extensions → `···` → **Install from VSIX...**
+- **Acode** — `Pyind-Acode-Plugin-1.1.0.zip`
+  - Pasang: Plugin → **Install plugin from file**
 
 Unduh dari [Releases Pyind](https://github.com/ZanderoDev/Pyind/releases).
 

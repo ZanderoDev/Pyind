@@ -66,6 +66,23 @@ Penyempurnaan mendasar pada lexer, parser, transpiler, dan dokumentasi.
   nama berkas, rentang lokasi, cuplikan sumber, dan penunjuk `^`.
 - Pesan galat lebih spesifik dan menyebut ejaan sumber yang ditemukan.
 
+#### Ekstensi editor
+
+- **Syntax highlighting VS Code** (`extensi/vscode/`) — grammar TextMate
+  dibangun ulang dari `keywords.py`; kini mencakup penghasil `hasilkan` /
+  `hasilkan_dari`, dekorator, operator `:=` dan `...`, angka biner/oktal/
+  heksa/kompleks, prefiks string gabungan `rb`/`br`/`fr`/`rf`, dan identifier
+  Unicode. `publisher` diperbaiki menjadi `ZanderoDev` (sebelumnya
+  `ilham-local` yang menunjuk repo orang lain).
+- **Syntax highlighting Acode** (`extensi/acode/`) — plugin StreamLanguage
+  ditulis ulang agar dapat dibaca dan memakai leksikon yang sama.
+- **Generator** (`extensi/alat/sinkronkan_leksikon.py`) — membangun ulang
+  grammar TextMate dan daftar kata kunci plugin dari `keywords.py`, sehingga
+  highlight tidak akan tertinggal dari transpiler.
+- **75 uji konsistensi** (`tests/test_highlight.py`) — memverifikasi grammar
+  mencakup seluruh leksikon dan tidak salah menandai soft keyword.
+- Ikon Acode diganti dari screenshot 900 KB menjadi ikon vektor-bentuk 3 KB.
+
 #### Dokumentasi
 - `docs/bahasa.md` — referensi bahasa lengkap: leksikon, literal,
   presedensi operator, fitur yang didukung dan belum didukung, serta

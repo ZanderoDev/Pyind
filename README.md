@@ -68,11 +68,16 @@ Pyind/
 ├── install.sh     # Installer otomatis
 ├── docs/
 │   └── bahasa.md  # Referensi bahasa lengkap
+├── extensi/
+│   ├── vscode/    # Syntax highlighting untuk VS Code
+│   ├── acode/     # Syntax highlighting untuk Acode
+│   └── alat/      # Generator grammar dari keywords.py
 ├── tests/
 │   ├── test_lexer.py
 │   ├── test_parser.py
 │   ├── test_transpiler.py
-│   └── test_regresi.py
+│   ├── test_regresi.py
+│   └── test_highlight.py
 └── contoh/
     ├── halo_dunia.pyind       # Contoh 1: Halo Dunia
     ├── kalkulator.pyind       # Contoh 2: Kalkulator
@@ -419,6 +424,32 @@ docs/bahasa.md
   Referensi bahasa lengkap: leksikon, literal, presedensi operator,
   fitur yang didukung dan belum didukung, serta format diagnostik.
 ```
+
+## Ekstensi Editor
+
+Syntax highlighting untuk file `.pyind`, tersedia untuk dua editor:
+
+| Editor | Paket | Cara pasang |
+|---|---|---|
+| VS Code | `pyind-syntax-1.1.0.vsix` | Extensions → `···` → **Install from VSIX...** |
+| Acode | `Pyind-Acode-Plugin-1.1.0.zip` | Plugin → **Install plugin from file** |
+
+Unduh dari [Releases Pyind](https://github.com/ZanderoDev/Pyind/releases).
+
+Keduanya menyorot kata kunci khusus, kata kunci kontekstual, penghasil,
+literal, angka (biner/oktal/heksa/kompleks), string berawalan, dekorator,
+dan identifier Unicode.
+
+Leksikon highlight **dibangun dari `keywords.py`** — satu sumber kebenaran.
+Kalau kata kunci berubah di transpiler, jalankan:
+
+```bash
+python extensi/alat/sinkronkan_leksikon.py
+```
+
+`tests/test_highlight.py` gagal bila grammar dan `keywords.py` tidak sinkron.
+
+---
 
 ## Lisensi
 

@@ -29,3 +29,7 @@ keluar*.py
 *.swo
 .DS_Store
 Thumbs.db
+
+# ── Paket ekstensi hasil build ─────────────────────────────────────────────
+extensi/vscode/*.vsix
+extensi/*.zip

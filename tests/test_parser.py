@@ -106,8 +106,14 @@ class TestEkspresi:
     def test_operasi_perbandingan(self):
         stmt = pertama("a == b\n")
         eksp = stmt["ekspresi"]
-        assert eksp["jenis"] == "BinOp"
-        assert eksp["op"] == "=="
+        assert eksp["jenis"] == "PerbandinganRantai"
+        assert eksp["segmen"][0]["op"] == "=="
+
+    def test_perbandingan_berantai(self):
+        stmt = pertama("a < b <= c\n")
+        eksp = stmt["ekspresi"]
+        assert eksp["jenis"] == "PerbandinganRantai"
+        assert [seg["op"] for seg in eksp["segmen"]] == ["<", "<="]
 
     def test_list_kosong(self):
         stmt = pertama("[]\n")
@@ -137,7 +143,7 @@ class TestPanggilan:
         stmt = pertama("cetak()\n")
         eksp = stmt["ekspresi"]
         assert eksp["jenis"] == "Panggilan"
-        assert eksp["fungsi"]["nama"] == "print"
+        assert eksp["fungsi"]["nama"] == "cetak"
         assert eksp["argumen"] == []
 
     def test_panggilan_dengan_argumen(self):
@@ -167,7 +173,7 @@ class TestJika:
         source = "jika x > 0:\n    cetak(x)\n"
         stmt = pertama(source)
         assert stmt["jenis"] == "Jika"
-        assert stmt["kondisi"]["jenis"] == "BinOp"
+        assert stmt["kondisi"]["jenis"] == "PerbandinganRantai"
         assert len(stmt["then"]) == 1
 
     def test_jika_lainnya(self):
@@ -180,7 +186,7 @@ class TestJika:
         source = "jika x > 0:\n    cetak(1)\njika_tidak x == 0:\n    cetak(0)\nlainnya:\n    cetak(-1)\n"
         stmt = pertama(source)
         assert len(stmt["elif"]) == 1
-        assert stmt["elif"][0]["kondisi"]["op"] == "=="
+        assert stmt["elif"][0]["kondisi"]["segmen"][0]["op"] == "=="
 
 
 # ── Test while ────────────────────────────────────────────────────────────────
@@ -190,7 +196,7 @@ class TestSelama:
         source = "selama i < 10:\n    i += 1\n"
         stmt = pertama(source)
         assert stmt["jenis"] == "Selama"
-        assert stmt["kondisi"]["op"] == "<"
+        assert stmt["kondisi"]["segmen"][0]["op"] == "<"
         assert len(stmt["tubuh"]) == 1
 
 

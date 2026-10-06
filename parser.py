@@ -1,452 +1,743 @@
 """
-parser.py — Parser Pyind: token → AST.
+parser.py — Parser Pyind: token menjadi AST.
 Bagian dari proyek Pyind (Python Indonesia).
 
-Parser ini menggunakan metode Recursive Descent Parsing.
-Setiap konstruk bahasa (if, while, for, fungsi, dsb.) memiliki
-metode parse tersendiri. Hasilnya adalah pohon AST berupa dict
-Python sederhana dengan kunci 'jenis'.
+Menggunakan *recursive descent* (descend rekursif): setiap level operator
+punya metode sendiri sehingga urutan presedensi jelas terbaca di kode.
+Hasilnya pohon AST berupa ``dict`` sederhana dengan kunci ``"jenis"``.
+
+Konvensi penting
+----------------
+
+* Nama identifier diambil dari ``Token.teks_asli``, bukan ``Token.nilai``.
+  Jadi penulisan ``fungsi cetak():`` menghasilkan fungsi bernama ``cetak``,
+  bukan ``print`` —_resolution_ alias builtin diserahkan ke transpiler.
+* Kata kunci kontekstual (``cetak``, ``dalam``, ``panjang``, …) boleh
+  identifier; pemakainya sebagai builtin diputuskan parser/transpiler.
+* Semuasimpul menyimpan ``baris`` untuk diagnostik yang lebih baik.
 """
 
 from __future__ import annotations
+
 from typing import Any
 
-from lexer import Token, TipeToken, Lexer
+from lexer import Lexer, Token, TipeToken
 from errors import (
-    err_token_diharapkan,
     err_ekspresi_diharapkan,
+    err_kata_kunci_sebagai_nama,
+    err_token_diharapkan,
+)
+from keywords import KATA_KUNCI_KHUSUS, KATA_KUNCI_KONTEKSTUAL
+
+#: Alias tipe untuk simpul AST.
+Simpul = dict[str, Any]
+
+#: Operator perbandingan (termasuk uji keanggotaan & identitas).
+OPERATOR_PERBANDINGAN: frozenset[str] = frozenset(
+    {"==", "!=", "<", ">", "<=", ">=", "in", "not in", "is", "is not"}
 )
 
-# Tipe alias untuk simpul AST
-Simpul = dict[str, Any]
+#: Operator penugasan gabungan.
+OPERATOR_GABUNGAN: frozenset[str] = frozenset(
+    {"+=", "-=", "*=", "/=", "%=", "**=", "//=", "&=", "|=", "^=", "<<=", ">>=", "@="}
+)
 
 
 class Parser:
     """
-    Menerima daftar token dari Lexer dan menghasilkan AST.
+    Mengubah daftar :class:`~lexer.Token` menjadi AST.
 
-    Contoh penggunaan:
+    Contoh::
+
         tokens = Lexer(source).tokenisasi()
-        ast = Parser(tokens).parse()
+        ast = Parser(tokens).urai()
     """
 
-    def __init__(self, tokens: list[Token]):
+    def __init__(self, tokens: list[Token], nama_berkas: str | None = None) -> None:
         self.tokens = tokens
         self.pos = 0
+        self.nama_berkas = nama_berkas
+        self._sumber_kw: dict[str, object] = {"berkas": nama_berkas} if nama_berkas else {}
 
     # ── API publik ────────────────────────────────────────────────────────────
 
-    def parse(self) -> Simpul:
-        """Parse seluruh program dan kembalikan simpul Modul."""
-        tubuh = self._parse_blok_modul()
+    def urai(self) -> Simpul:
+        """Urai seluruh program; kembalikan simpul ``Modul``."""
+        tubuh = self._urai_blok_modul()
         return {"jenis": "Modul", "tubuh": tubuh}
+
+    #: Alias kompatibilitas ke API Inggris.
+    parse = urai
 
     # ── Navigasi token ────────────────────────────────────────────────────────
 
     def _saat_ini(self) -> Token:
         return self.tokens[self.pos]
 
-    def _intip(self, offset: int = 1) -> Token:
-        idx = self.pos + offset
-        return self.tokens[idx] if idx < len(self.tokens) else self.tokens[-1]
+    def _intip(self, jarak: int = 1) -> Token:
+        indeks = self.pos + jarak
+        return self.tokens[indeks] if indeks < len(self.tokens) else self.tokens[-1]
 
     def _maju(self) -> Token:
-        tok = self.tokens[self.pos]
+        """Kembalikan token saat ini lalu geser kursor satu langkah."""
+        token = self.tokens[self.pos]
         if self.pos < len(self.tokens) - 1:
             self.pos += 1
-        return tok
+        return token
 
-    def _cocokkan(self, *tipe_atau_nilai: str) -> Token:
-        """Pastikan token saat ini cocok lalu maju; lempar error jika tidak."""
-        tok = self._saat_ini()
-        for tv in tipe_atau_nilai:
-            if tok.nilai == tv or tok.tipe.name == tv:
+    def _cocok(self, *nilai_atau_tipe: str) -> Token:
+        """
+        Pastikan token saat ini cocok dengan salah satu kriteria, lalu maju.
+
+        Kriteria dicocokkan terhadap *nilai* token (``")"``, ``"if"`` …) atau
+        *nama tipenya* (``"INDENT"``, ``"DEDENT"``, ``"EOF"``).
+        """
+        token = self._saat_ini()
+        for kriteria in nilai_atau_tipe:
+            if self._token_cocok(token, kriteria):
                 return self._maju()
-        diharapkan = " atau ".join(f"'{x}'" for x in tipe_atau_nilai)
-        raise err_token_diharapkan(diharapkan, str(tok.nilai), tok.baris, tok.kolom)
+        raise err_token_diharapkan(
+            " atau ".join(f"{c!r}" for c in nilai_atau_tipe),
+            self._label(token),
+            token.baris,
+            token.kolom,
+            **self._sumber_kw,
+        )
 
-    def _ambil_ident(self) -> str:
-        """
-        Ambil token berikutnya sebagai identifier (nama).
-        Menerima NAMA, KATA_KUNCI, BENAR, SALAH, KOSONG agar kata kunci
-        Bahasa Indonesia bisa dipakai sebagai nama fungsi/metode/parameter.
+    def _cocok_maka(self, *nilai_atau_tipe: str) -> bool:
+        """Coba cocokkan; kembalikan True dan maju bila berhasil."""
+        if self._cocok_saja(*nilai_atau_tipe):
+            self._maju()
+            return True
+        return False
 
-        Untuk BENAR/SALAH/KOSONG, nilai-nya adalah teks Indonesia asli
-        ("benar", "salah", "kosong") yang tetap valid sebagai nama Python.
-        Untuk KATA_KUNCI, nilai-nya adalah padanan Python ("print", dst.).
+    def _cocok_saja(self, *nilai_atau_tipe: str) -> bool:
+        """Periksa kecocokan tanpa bergerak."""
+        token = self._saat_ini()
+        return any(self._token_cocok(token, kriteria) for kriteria in nilai_atau_tipe)
+
+    @staticmethod
+    def _token_cocok(token: Token, kriteria: str) -> bool:
         """
-        tok = self._saat_ini()
-        TIPE_IDENT = {
-            TipeToken.NAMA, TipeToken.KATA_KUNCI,
-            TipeToken.BENAR, TipeToken.SALAH, TipeToken.KOSONG,
-        }
-        if tok.tipe not in TIPE_IDENT:
-            raise err_token_diharapkan("NAMA", str(tok.nilai), tok.baris, tok.kolom)
+        True bila ``token`` cocok dengan ``kriteria``.
+
+        Token struktural (INDENT/DEDENT/EOF) dicocokkan lewat nama tipe;
+        token lainnya lewat nilai (``")"``, ``"if"``, …). Pencocokan lewat
+        nilai murni sudah cukup karena nilai token struktural tidak pernah
+        bentrok dengan tanda baca.
+        """
+        if token.tipe in (TipeToken.INDENT, TipeToken.DEDENT, TipeToken.EOF):
+            return token.tipe.name == kriteria
+        return str(token.nilai) == kriteria
+
+    @staticmethod
+    def _label(token: Token) -> str:
+        """Nama ramah untuk pesan error: pakai teks asli bila ada."""
+        return str(token.teks_asli if token.teks_asli else token.nilai)
+
+    def _cocok_teks(self, teks: str) -> bool:
+        """Cocokkan berdasarkan *teks sumber* (mis. ``dalam`` untuk ``in``)."""
+        return str(self._saat_ini().teks_asli) == teks
+
+    def _cocok_teks_maka(self, teks: str) -> bool:
+        """Cocokkan berdasarkan teks sumber lalu maju bila cocok."""
+        if self._cocok_teks(teks):
+            self._maju()
+            return True
+        return False
+
+    def _di_akhir_baris(self) -> bool:
+        """True bila pernyataan selesai (baris baru, DEDENT, atau EOF)."""
+        return self._saat_ini().tipe in (
+            TipeToken.BARIS_BARU,
+            TipeToken.INDENT,
+            TipeToken.DEDENT,
+            TipeToken.EOF,
+        )
+
+    # ── Pengambilan nama ──────────────────────────────────────────────────────
+
+    def _bisa_jadi_nama(self, token: Token | None = None, *, teks: bool = False) -> bool:
+        """
+        True bila token boleh dipakai sebagai identifier.
+
+        Token :attr:`~lexer.TipeToken.NAMA` dan *soft keyword* boleh. Kata
+        kunci khusus (``fungsi``, ``jika``, …) tidak — memakai ``fungsi`` sebagai
+        nama variabel adalah kesalahan sintaks yang perlu dilaporkan.
+
+        Parameter ``teks`` melonggarkan aturan untuk nama setelah titik
+        (``diri.kosong()``). Python sendiri mengizinkan ``None``/``True``
+        sebagai nama atribut, jadi literal ``benar``/``salah``/``kosong``
+        juga harus sah di posisi itu.
+        """
+        token = token if token is not None else self._saat_ini()
+        if token.tipe is TipeToken.NAMA:
+            return True
+        if token.tipe is TipeToken.KATA_KUNCI:
+            return token.teks_asli in KATA_KUNCI_KONTEKSTUAL
+        if teks and token.tipe in (TipeToken.BENAR, TipeToken.SALAH, TipeToken.KOSONG):
+            return True
+        return False
+
+    def _ambil_nama(self, *, teks: bool = False) -> str:
+        """
+        Ambil nama identifier dari token saat ini.
+
+        Mengembalikan ``Token.teks_asli`` supaya ejaan Bahasa Indonesia
+        tidak berubah jadi padanan Python. Soft keyword yang dipakai sebagai
+        nama (``cetak = 1``) diperbolehkan; pemakainya sebagai builtin
+        (@:mod:`transpiler`) ditentukan terpisah.
+        """
+        token = self._saat_ini()
+        if not self._bisa_jadi_nama(token, teks=teks):
+            if token.tipe is TipeToken.KATA_KUNCI:
+                raise err_kata_kunci_sebagai_nama(
+                    self._label(token), token.baris, token.kolom, **self._sumber_kw
+                )
+            raise err_token_diharapkan(
+                "nama", self._label(token), token.baris, token.kolom, **self._sumber_kw
+            )
         self._maju()
-        return str(tok.nilai)
+        return str(token.teks_asli if token.teks_asli else token.nilai)
+
+    # ── Blok ──────────────────────────────────────────────────────────────────
 
     def _lewati_baris_baru(self) -> None:
-        while self._saat_ini().tipe == TipeToken.BARIS_BARU:
+        while self._saat_ini().tipe is TipeToken.BARIS_BARU:
             self._maju()
 
-    def _adalah(self, *nilai_atau_tipe: str) -> bool:
-        tok = self._saat_ini()
-        return tok.nilai in nilai_atau_tipe or tok.tipe.name in nilai_atau_tipe
-
-    def _adalah_eof(self) -> bool:
-        return self._saat_ini().tipe == TipeToken.EOF
-
-    # ── Parsing blok ─────────────────────────────────────────────────────────
-
-    def _parse_blok_modul(self) -> list[Simpul]:
+    def _urai_blok_modul(self) -> list[Simpul]:
+        """Urai daftar pernyataan tingkat modul."""
         pernyataan: list[Simpul] = []
         self._lewati_baris_baru()
-        while not self._adalah_eof():
-            stmt = self._parse_pernyataan()
-            if stmt is not None:
-                pernyataan.append(stmt)
+        while self._saat_ini().tipe is not TipeToken.EOF:
+            pernyataan.extend(self._urai_pernyataan_blok())
             self._lewati_baris_baru()
         return pernyataan
 
-    def _parse_blok_indented(self) -> list[Simpul]:
-        """Parse blok yang diindentasi (tubuh if, while, for, fungsi, dsb.)."""
-        self._lewati_baris_baru()
-        self._cocokkan("INDENT")
-        self._lewati_baris_baru()
-
-        pernyataan: list[Simpul] = []
-        while not self._adalah("DEDENT") and not self._adalah_eof():
-            stmt = self._parse_pernyataan()
-            if stmt is not None:
-                pernyataan.append(stmt)
+    def _urai_pernyataan_blok(self) -> list[Simpul]:
+        """Urai satu atau beberapa pernyataan pada level indentasi ini."""
+        hasil: list[Simpul] = []
+        while self._saat_ini().tipe not in (TipeToken.DEDENT, TipeToken.EOF):
+            sebelum = self.pos
+            simpul = self._urai_pernyataan()
+            if simpul is not None:
+                hasil.append(simpul)
             self._lewati_baris_baru()
+            if self.pos == sebelum:
+                # Tidak ada kemajuan: cegah putaran tak berakhir.
+                token = self._saat_ini()
+                if token.tipe in (TipeToken.DEDENT, TipeToken.EOF):
+                    break
+                raise err_token_diharapkan(
+                    "pernyataan", self._label(token),
+                    token.baris, token.kolom, **self._sumber_kw,
+                )
+        return hasil
 
-        if self._adalah("DEDENT"):
-            self._maju()
-        return pernyataan
-
-    # ── Parsing pernyataan ────────────────────────────────────────────────────
-
-    def _parse_pernyataan(self) -> Simpul | None:
-        """Arahkan ke parser pernyataan yang tepat berdasarkan token saat ini."""
+    def _urai_blok_indent(self) -> list[Simpul]:
+        """Urai blok terindentasi setelah tanda ``:``."""
         self._lewati_baris_baru()
-        tok = self._saat_ini()
+        if self._saat_ini().tipe is not TipeToken.INDENT:
+            token = self._saat_ini()
+            raise err_token_diharapkan(
+                "blok terindentasi setelah ':'", self._label(token),
+                token.baris, token.kolom, **self._sumber_kw,
+            )
+        self._maju()
+        hasil = self._urai_pernyataan_blok()
+        if self._saat_ini().tipe is TipeToken.DEDENT:
+            self._maju()
+        return hasil
 
-        if tok.tipe in (TipeToken.EOF, TipeToken.DEDENT):
+    # ── Pernyataan ────────────────────────────────────────────────────────────
+
+    def _urai_pernyataan(self) -> Simpul | None:
+        """Pilih handler pernyataan berdasarkan token saat ini."""
+        self._lewati_baris_baru()
+        token = self._saat_ini()
+        if token.tipe in (TipeToken.EOF, TipeToken.DEDENT, TipeToken.INDENT):
             return None
 
-        nilai = tok.nilai
+        # Dekorator: '@nama' di awal baris
+        if token.tipe is TipeToken.OP and token.nilai == "@":
+            return self._urai_dekorator()
 
-        if nilai == "def":       return self._parse_fungsi()
-        if nilai == "class":     return self._parse_kelas()
-        if nilai == "if":        return self._parse_jika()
-        if nilai == "while":     return self._parse_selama()
-        if nilai == "for":       return self._parse_untuk()
-        if nilai == "return":    return self._parse_kembali()
-        if nilai == "import":    return self._parse_impor()
-        if nilai == "from":      return self._parse_dari()
-        if nilai == "try":       return self._parse_coba()
-        if nilai == "del":       return self._parse_hapus()
-        if nilai == "global":    return self._parse_global()
-        if nilai == "nonlocal":  return self._parse_nonlokal()
-        if nilai == "assert":    return self._parse_assert()
-        if nilai == "raise":     return self._parse_naikkan()
-        if nilai == "with":      return self._parse_bersama()
+        nilai = str(token.nilai)
 
-        if nilai == "break":
-            self._maju(); self._lewati_baris_baru()
-            return {"jenis": "Hentikan"}
-        if nilai == "continue":
-            self._maju(); self._lewati_baris_baru()
-            return {"jenis": "Lanjut"}
-        if nilai == "pass":
-            self._maju(); self._lewati_baris_baru()
-            return {"jenis": "Lewati"}
+        # Kata kunci async/await
+        if nilai == "async" and self._intip(1).nilai in ("def", "for", "with"):
+            return self._urai_asinkron()
+        if nilai == "async":
+            return self._urai_pernyataan_ekspresi()
 
-        return self._parse_ekspresi_atau_penugasan()
+        tabela: dict[str, Any] = {
+            "def": self._urai_fungsi,
+            "class": self._urai_kelas,
+            "if": self._urai_jika,
+            "while": self._urai_selama,
+            "for": self._urai_untuk,
+            "return": self._urai_kembali,
+            "import": self._urai_impor,
+            "from": self._urai_dari,
+            "try": self._urai_coba,
+            "del": self._urai_hapus,
+            "global": self._urai_global,
+            "nonlocal": self._urai_nonlokal,
+            "assert": self._urai_pernyataan_kondisi,
+            "raise": self._urai_naikkan,
+            "with": self._urai_bersama,
+            "match": self._urai_cocok_pola,
+        }
+        if nilai in tabela:
+            return tabela[nilai]()
 
-    def _parse_ekspresi_atau_penugasan(self) -> Simpul:
-        """
-        Parse ekspresi atau pernyataan penugasan.
-        Mendukung tuple unpacking: a, b = 0, 1
-        """
-        ekspresi = self._parse_ekspresi()
-
-        # ── Tangani tuple di sisi kiri: a, b = ... ────────────────────────
-        if self._adalah(","):
-            elemen = [ekspresi]
-            while self._adalah(","):
+        # Pernyataan sederhana tanpa nilai
+        for kata, jenis in (("break", "Hentikan"), ("continue", "Lanjut"), ("pass", "Lewati")):
+            if nilai == kata:
                 self._maju()
-                tok_dep = self._saat_ini()
-                # Berhenti jika token berikutnya bukan bagian dari ekspresi
-                if tok_dep.tipe in (TipeToken.BARIS_BARU, TipeToken.EOF, TipeToken.DEDENT):
-                    break
-                if tok_dep.tipe == TipeToken.OP and tok_dep.nilai == "=":
-                    break
-                elemen.append(self._parse_ekspresi())
-            ekspresi = {"jenis": "Tuple", "elemen": elemen}
+                return {"jenis": jenis, "baris": token.baris}
 
-        tok = self._saat_ini()
+        return self._urai_ekspresi_atau_penugasan()
 
-        # ── Penugasan biasa: target = nilai ───────────────────────────────
-        if tok.nilai == "=" and tok.tipe == TipeToken.OP:
+    def _urai_dekorator(self) -> list[Simpul]:
+        """Urai satu atau lebih dekorator menjadi daftar simpul."""
+        dekorator: list[Simpul] = []
+        while self._cocok_saja("@"):
+            token = self._saat_ini()
             self._maju()
-            nilai = self._parse_ekspresi()
-            # Tangani tuple di sisi kanan: = a, b
-            if self._adalah(","):
-                elemen_kanan = [nilai]
-                while self._adalah(","):
-                    self._maju()
-                    tok_dep = self._saat_ini()
-                    if tok_dep.tipe in (TipeToken.BARIS_BARU, TipeToken.EOF, TipeToken.DEDENT):
-                        break
-                    elemen_kanan.append(self._parse_ekspresi())
-                nilai = {"jenis": "Tuple", "elemen": elemen_kanan}
+            ekspresi = self._urai_ekspresi()
+            dekorator.append({"ekspresi": ekspresi, "baris": token.baris})
             self._lewati_baris_baru()
-            return {"jenis": "Penugasan", "target": ekspresi, "nilai": nilai}
-
-        # ── Penugasan gabungan: +=, -=, *=, /=, dsb. ─────────────────────
-        op_gabung = {"+=", "-=", "*=", "/=", "%=", "**=", "//="}
-        if tok.tipe == TipeToken.OP and tok.nilai in op_gabung:
-            op = self._maju().nilai
-            nilai = self._parse_ekspresi()
-            self._lewati_baris_baru()
-            return {"jenis": "PenugasanGabungan", "op": op, "target": ekspresi, "nilai": nilai}
-
+        # Setelah dekorator wajib pernyataan yang bisa diberi dekorator
         self._lewati_baris_baru()
-        return {"jenis": "EkspresiPernyataan", "ekspresi": ekspresi}
+        token = self._saat_ini()
+        target = self._urai_pernyataan()
+        if target is None:
+            raise err_token_diharapkan(
+                "fungsi atau kelas setelah dekorator", self._label(token),
+                token.baris, token.kolom, **self._sumber_kw,
+            )
+        target = dict(target)
+        target["dekorator"] = dekorator
+        return target
+
+    def _urai_asinkron(self) -> Simpul:
+        """Urai ``async fungsi``, ``async untuk``, atau ``async bersama``."""
+        async_token = self._cocok("async")
+        berikut = self._saat_ini()
+        if berikut.nilai == "def":
+            simpul = self._urai_fungsi()
+            simpul["asinkron"] = True
+            simpul["baris"] = async_token.baris
+            return simpul
+        if berikut.nilai == "for":
+            simpul = self._urai_untuk()
+            simpul["asinkron"] = True
+            simpul["baris"] = async_token.baris
+            return simpul
+        if berikut.nilai == "with":
+            simpul = self._urai_bersama()
+            simpul["asinkron"] = True
+            simpul["baris"] = async_token.baris
+            return simpul
+        raise err_token_diharapkan(
+            "'fungsi', 'untuk', atau 'bersama' setelah 'async'",
+            self._label(berikut), berikut.baris, berikut.kolom, **self._sumber_kw,
+        )
+
+    def _urai_ekspresi_atau_penugasan(self) -> Simpul:
+        """
+        Urai ekspresi solitary atau penugasan.
+
+        Menangani:
+        * ``x = nilai`` dan tuple unpacking ``a, b = …``
+        * penugasan gabungan ``x += 1``
+        * penugasan bertanda ``x: int = 5``
+        * penugasan berbintang ``*x, y = data``
+        """
+        # Penugasan bertanda: nama : anotasi [= nilai]
+        if self._bisa_jadi_nama() and self._intip(1).tipe is TipeToken.DELIMITER \
+                and self._intip(1).nilai == ":" and not self._di_akhir_baris_setelah(2):
+            return self._urai_penugasan_bertanda()
+
+        # Sisi kiri bisa berupa tuple: a, b = ...
+        target = self._urai_target_penugasan()
+
+        token = self._saat_ini()
+
+        if token.tipe is TipeToken.OP and token.nilai == "=":
+            self._maju()
+            nilai = self._urai_ekspresi_dengan_koma()
+            return {"jenis": "Penugasan", "target": target, "nilai": nilai, "baris": token.baris}
+
+        if token.tipe is TipeToken.OP and token.nilai in OPERATOR_GABUNGAN:
+            self._maju()
+            nilai = self._urai_ekspresi_dengan_koma()
+            return {
+                "jenis": "PenugasanGabungan",
+                "op": str(token.nilai),
+                "target": target,
+                "nilai": nilai,
+                "baris": token.baris,
+            }
+
+        if token.tipe is TipeToken.OP and token.nilai == ":=":
+            self._maju()
+            nilai = self._urai_ekspresi()
+            return {"jenis": "PenugasanEkspresi", "target": target, "nilai": nilai, "baris": token.baris}
+
+        return {"jenis": "EkspresiPernyataan", "ekspresi": target, "baris": token.baris}
+
+    def _di_akhir_baris_setelah(self, jarak: int) -> bool:
+        """True bila token pada jarak tertentu menutup baris."""
+        return self._intip(jarak).tipe in (
+            TipeToken.BARIS_BARU, TipeToken.DEDENT, TipeToken.EOF
+        )
+
+    def _urai_penugasan_bertanda(self) -> Simpul:
+        """Urai ``nama: anotasi = nilai``."""
+        token = self._saat_ini()
+        nama = self._ambil_nama()
+        self._cocok(":")
+        anotasi = self._urai_ekspresi()
+        nilai = None
+        if self._cocok_maka("="):
+            nilai = self._urai_ekspresi_dengan_koma()
+        return {
+            "jenis": "PenugasanBertanda",
+            "nama": nama,
+            "anotasi": anotasi,
+            "nilai": nilai,
+            "baris": token.baris,
+        }
+
+    def _urai_target_penugasan(self) -> Simpul:
+        """
+        Urai sisi kiri penugasan: nama, atribut, subskrip, atau tuple.
+
+        Berbeda dari ekspresi biasa, target boleh berupa ``*nama`` (unpacking).
+        """
+        elemen: list[Simpul] = []
+
+        while True:
+            if self._cocok_saja("*"):
+                self._maju()
+                nama = self._ambil_nama()
+                elemen.append({"jenis": "Bintang", "nilai": {"jenis": "Nama", "nama": nama}})
+            else:
+                elemen.append(self._urai_ekspresi())
+
+            if self._cocok_saja(","):
+                self._maju()
+                # Kurung tutup / baris baru menghentikan tuple
+                if self._di_akhir_baris() or self._cocok_saja("="):
+                    break
+                continue
+            break
+
+        if len(elemen) == 1 and elemen[0].get("jenis") != "Bintang":
+            return elemen[0]
+        return {"jenis": "Tuple", "elemen": elemen}
+
+    def _urai_ekspresi_dengan_koma(self) -> Simpul:
+        """Urai ekspresi yang boleh berupa tuple (sisi kanan penugasan)."""
+        pertama = self._urai_ekspresi()
+        if not self._cocok_saja(","):
+            return pertama
+        elemen = [pertama]
+        while self._cocok_maka(","):
+            if self._di_akhir_baris() or self._cocok_saja("=", ")", "]", "}"):
+                break
+            elemen.append(self._urai_ekspresi())
+        return {"jenis": "Tuple", "elemen": elemen}
 
     # ── Pernyataan terstruktur ────────────────────────────────────────────────
 
-    def _parse_fungsi(self) -> Simpul:
-        """Parse: def nama(param...): blok"""
-        self._cocokkan("def")
-        nama = self._ambil_ident()   # terima keyword sebagai nama fungsi/metode
-        self._cocokkan("(")
-        params = self._parse_daftar_parameter()
-        self._cocokkan(")")
-        kembali_anotasi = None
-        if self._adalah("->"):
+    def _urai_fungsi(self) -> Simpul:
+        """Urai definisi fungsi: ``fungsi nama(params) -> anotasi:``."""
+        token = self._cocok("def")
+        nama = self._ambil_nama(teks=True)
+        self._cocok("(")
+        parameter = self._urai_daftar_parameter()
+        self._cocok(")")
+
+        anotasi_kembali = None
+        if self._cocok_saja("->"):
             self._maju()
-            kembali_anotasi = self._parse_ekspresi()
-        self._cocokkan(":")
-        self._lewati_baris_baru()
-        tubuh = self._parse_blok_indented()
+            anotasi_kembali = self._urai_ekspresi()
+
+        self._cocok(":")
+        tubuh = self._urai_blok_indent()
         return {
             "jenis": "DefinisiFungsi",
             "nama": nama,
-            "parameter": params,
-            "kembali_anotasi": kembali_anotasi,
+            "parameter": parameter,
+            "kembali_anotasi": anotasi_kembali,
             "tubuh": tubuh,
+            "baris": token.baris,
         }
 
-    def _parse_daftar_parameter(self) -> list[Simpul]:
-        """Parse daftar parameter fungsi termasuk default dan *args/**kwargs."""
-        params: list[Simpul] = []
-        while not self._adalah(")") and not self._adalah_eof():
-            param: Simpul = {}
-            if self._adalah("**"):
-                self._maju()
-                param["bintang"] = "**"
-            elif self._adalah("*"):
-                self._maju()
-                param["bintang"] = "*"
+    def _urai_daftar_parameter(self) -> list[Simpul]:
+        """
+        Urai daftar parameter fungsi.
 
-            # Terima keyword sebagai nama parameter (misal: fungsi f(kosong=None))
-            TIPE_IDENT = {TipeToken.NAMA, TipeToken.KATA_KUNCI,
-                          TipeToken.BENAR, TipeToken.SALAH, TipeToken.KOSONG}
-            if self._saat_ini().tipe in TIPE_IDENT:
-                param["nama"] = self._ambil_ident()
-            else:
+        Didukung: anotasi, nilai bawaan, ``*args``, ``**kwargs``,
+        parameter posisional-only ``/``, dan keyword-only ``*``.
+
+        Pemisah ``/`` dan ``*`` disimpan sebagai entri :data:`PEMISAH` agar
+        urutan aslinya terjaga; transpiler hanya perlu merakit ulang sesuai
+        urutan kemunculannya.
+        """
+        parameter: list[Simpul] = []
+
+        while not self._cocok_saja(")") and self._saat_ini().tipe is not TipeToken.EOF:
+            token = self._saat_ini()
+
+            # Pemisah posisional-only: '/'
+            if token.tipe is TipeToken.OP and token.nilai == "/":
+                self._maju()
+                parameter.append({"jenis": "PEMISAH", "tanda": "/", "posisi": "posonly"})
+                if self._cocok_maka(","):
+                    continue
                 break
 
-            if self._adalah(":"):
+            # '*' pemisah keyword-only, atau '*args'
+            if token.tipe is TipeToken.OP and token.nilai == "*":
                 self._maju()
-                param["anotasi"] = self._parse_ekspresi()
-            if self._adalah("="):
-                self._maju()
-                param["default"] = self._parse_ekspresi()
-
-            params.append(param)
-            if self._adalah(","):
-                self._maju()
-            else:
+                if self._bisa_jadi_nama():
+                    parameter.append(self._urai_parameter("positional", "*"))
+                else:
+                    parameter.append({"jenis": "PEMISAH", "tanda": "*", "posisi": "kwonly"})
+                if self._cocok_maka(","):
+                    continue
                 break
-        return params
 
-    def _parse_kelas(self) -> Simpul:
-        """Parse: class Nama(Base...): blok"""
-        self._cocokkan("class")
-        nama = self._ambil_ident()   # terima keyword sebagai nama kelas
-        induk: list[Simpul] = []
-        if self._adalah("("):
+            # '**kwargs'
+            if token.tipe is TipeToken.OP and token.nilai == "**":
+                self._maju()
+                parameter.append(self._urai_parameter("positional", "**"))
+                if self._cocok_maka(","):
+                    continue
+                break
+
+            parameter.append(self._urai_parameter("positional", None))
+
+            if self._cocok_maka(","):
+                continue
+            break
+
+        # Tandai parameter yang sesudah '/' sebagai posisional biasa
+        ada_pemisah_posonly = any(
+            p.get("jenis") == "PEMISAH" and p.get("tanda") == "/" for p in parameter
+        )
+        if ada_pemisah_posonly:
+            lewat = False
+            for p in parameter:
+                if p.get("jenis") == "PEMISAH" and p.get("tanda") == "/":
+                    lewat = True
+                    continue
+                if lewat and p.get("posisi") == "positional" and not p.get("bintang"):
+                    p["posisi"] = "setelah_pemisah"
+
+        return parameter
+
+    def _urai_parameter(self, posisi: str, bintang: str | None) -> Simpul:
+        """Urai satu parameter beserta anotasi dan nilai bawaannya."""
+        nama = self._ambil_nama(teks=True)
+        anotasi = None
+        nilai = None
+        if self._cocok_saja(":"):
             self._maju()
-            while not self._adalah(")") and not self._adalah_eof():
-                induk.append(self._parse_ekspresi())
-                if self._adalah(","):
-                    self._maju()
-            self._cocokkan(")")
-        self._cocokkan(":")
-        self._lewati_baris_baru()
-        tubuh = self._parse_blok_indented()
-        return {"jenis": "DefinisiKelas", "nama": nama, "induk": induk, "tubuh": tubuh}
+            anotasi = self._urai_ekspresi()
+        if self._cocok_saja("="):
+            self._maju()
+            nilai = self._urai_ekspresi()
+        simpul: Simpul = {"nama": nama, "posisi": posisi}
+        if bintang:
+            simpul["bintang"] = bintang
+        if anotasi is not None:
+            simpul["anotasi"] = anotasi
+        if nilai is not None:
+            simpul["nilai_bawaan"] = nilai
+        return simpul
 
-    def _parse_jika(self) -> Simpul:
-        """Parse: if kondisi: blok [elif: blok]* [else: blok]"""
-        self._cocokkan("if")
-        kondisi = self._parse_ekspresi()
-        self._cocokkan(":")
-        self._lewati_baris_baru()
-        then_blok = self._parse_blok_indented()
+    def _urai_kelas(self) -> Simpul:
+        """Urai definisi kelas: ``kelas Nama(Induk, ...):``."""
+        token = self._cocok("class")
+        nama = self._ambil_nama(teks=True)
+        induk: list[Simpul] = []
+        if self._cocok_maka("("):
+            while not self._cocok_saja(")") and self._saat_ini().tipe is not TipeToken.EOF:
+                induk.append(self._urai_ekspresi())
+                if not self._cocok_maka(","):
+                    break
+            self._cocok(")")
+
+        self._cocok(":")
+        tubuh = self._urai_blok_indent()
+        return {
+            "jenis": "DefinisiKelas",
+            "nama": nama,
+            "induk": induk,
+            "tubuh": tubuh,
+            "baris": token.baris,
+        }
+
+    def _urai_jika(self) -> Simpul:
+        """Urai ``jika / jika_tidak / lainnya``."""
+        token = self._cocok("if")
+        kondisi = self._urai_ekspresi_dengan_koma()
+        self._cocok(":")
+        cabang_then = self._urai_blok_indent()
 
         elif_cabang: list[Simpul] = []
-        else_blok: list[Simpul] = []
-
         self._lewati_baris_baru()
-        while self._adalah("elif"):
+        while self._cocok_saja("elif"):
             self._maju()
-            k = self._parse_ekspresi()
-            self._cocokkan(":")
-            self._lewati_baris_baru()
-            b = self._parse_blok_indented()
-            elif_cabang.append({"kondisi": k, "tubuh": b})
+            elif_kondisi = self._urai_ekspresi_dengan_koma()
+            self._cocok(":")
+            elif_cabang.append({"kondisi": elif_kondisi, "tubuh": self._urai_blok_indent()})
             self._lewati_baris_baru()
 
-        if self._adalah("else"):
+        else_blok: list[Simpul] = []
+        if self._cocok_saja("else"):
             self._maju()
-            self._cocokkan(":")
-            self._lewati_baris_baru()
-            else_blok = self._parse_blok_indented()
+            self._cocok(":")
+            else_blok = self._urai_blok_indent()
 
         return {
             "jenis": "Jika",
             "kondisi": kondisi,
-            "then": then_blok,
+            "then": cabang_then,
             "elif": elif_cabang,
             "else": else_blok,
+            "baris": token.baris,
         }
 
-    def _parse_selama(self) -> Simpul:
-        """Parse: while kondisi: blok"""
-        self._cocokkan("while")
-        kondisi = self._parse_ekspresi()
-        self._cocokkan(":")
-        self._lewati_baris_baru()
-        tubuh = self._parse_blok_indented()
-        return {"jenis": "Selama", "kondisi": kondisi, "tubuh": tubuh}
+    def _urai_selama(self) -> Simpul:
+        """Urai loop ``selama``."""
+        token = self._cocok("while")
+        kondisi = self._urai_ekspresi_dengan_koma()
+        self._cocok(":")
+        return {
+            "jenis": "Selama",
+            "kondisi": kondisi,
+            "tubuh": self._urai_blok_indent(),
+            "baris": token.baris,
+        }
 
-    def _parse_untuk(self) -> Simpul:
-        """Parse: for var in iterable: blok"""
-        self._cocokkan("for")
-        target = self._parse_target_for()
-        self._cocokkan("in")
-        iterable = self._parse_ekspresi()
-        self._cocokkan(":")
-        self._lewati_baris_baru()
-        tubuh = self._parse_blok_indented()
-        return {"jenis": "Untuk", "target": target, "iterable": iterable, "tubuh": tubuh}
+    def _urai_untuk(self) -> Simpul:
+        """Urai loop ``untuk … dalam …``."""
+        token = self._cocok("for")
+        target = self._urai_target_penugasan()
+        # 'dalam'/'in' bisa ditulis sebagai soft keyword atau kata kunci Python
+        if not (self._cocok_teks_maka("dalam") or self._cocok_maka("in")):
+            token_kini = self._saat_ini()
+            raise err_token_diharapkan(
+                "'dalam' atau 'in'", self._label(token_kini),
+                token_kini.baris, token_kini.kolom, **self._sumber_kw,
+            )
+        iterable = self._urai_ekspresi_dengan_koma()
+        self._cocok(":")
+        return {
+            "jenis": "Untuk",
+            "target": target,
+            "iterable": iterable,
+            "tubuh": self._urai_blok_indent(),
+            "baris": token.baris,
+        }
 
-    def _parse_target_for(self) -> Simpul:
-        """Parse target loop for — bisa nama tunggal atau tuple: a, b"""
-        if self._saat_ini().tipe == TipeToken.NAMA:
-            nama = self._maju().nilai
-            if self._adalah(","):
-                elemen = [{"jenis": "Nama", "nama": nama}]
-                while self._adalah(","):
-                    self._maju()
-                    if self._saat_ini().tipe == TipeToken.NAMA:
-                        elemen.append({"jenis": "Nama", "nama": self._maju().nilai})
-                return {"jenis": "Tuple", "elemen": elemen}
-            return {"jenis": "Nama", "nama": nama}
-        return self._parse_ekspresi()
+    def _urai_kembali(self) -> Simpul:
+        """Urai ``kembalikan [nilai]``."""
+        token = self._cocok("return")
+        nilai = None
+        if not self._di_akhir_baris():
+            nilai = self._urai_ekspresi_dengan_koma()
+        return {"jenis": "Kembali", "nilai": nilai, "baris": token.baris}
 
-    def _parse_kembali(self) -> Simpul:
-        self._cocokkan("return")
-        if self._adalah("BARIS_BARU") or self._adalah_eof():
-            return {"jenis": "Kembali", "nilai": None}
-        nilai = self._parse_ekspresi()
-        self._lewati_baris_baru()
-        return {"jenis": "Kembali", "nilai": nilai}
-
-    def _parse_impor(self) -> Simpul:
-        """Parse: import modul [as alias]"""
-        self._cocokkan("import")
-        nama = self._parse_nama_titik()
+    def _urai_impor(self) -> Simpul:
+        """Urai ``impor modul [sebagai alias]``."""
+        token = self._cocok("import")
+        nama = self._urai_nama_titik()
         alias = None
-        if self._adalah("as"):
+        if self._adalah_alias():
             self._maju()
-            alias = self._cocokkan("NAMA").nilai
-        self._lewati_baris_baru()
-        return {"jenis": "Impor", "nama": nama, "alias": alias}
+            alias = self._ambil_nama()
+        return {"jenis": "Impor", "nama": nama, "alias": alias, "baris": token.baris}
 
-    def _parse_dari(self) -> Simpul:
-        """Parse: from modul import nama [as alias], ..."""
-        self._cocokkan("from")
-        modul = self._parse_nama_titik()
-        self._cocokkan("import")
-        if self._adalah("*"):
-            self._maju()
-            self._lewati_baris_baru()
-            return {"jenis": "DariImpor", "modul": modul, "nama": [{"nama": "*", "alias": None}]}
-        dengan_kurung = self._adalah("(")
-        if dengan_kurung:
-            self._maju()
-        nama_list: list[dict] = []
+    def _adalah_alias(self) -> bool:
+        """True bila token adalah penanda alias (``sebagai``/``menjadi``/``as``)."""
+        return self._cocok_saja("as") or self._cocok_teks("menjadi")
+
+    def _urai_dari(self) -> Simpul:
+        """Urai ``dari modul impor a, b [sebagai c]``."""
+        token = self._cocok("from")
+        modul = self._urai_nama_titik()
+        self._cocok("import")
+
+        # Tanda bintang: 'dari modul impor *'
+        if self._cocok_saja("*"):
+            return {
+                "jenis": "DariImpor",
+                "modul": modul,
+                "nama": [{"nama": "*", "alias": None}],
+                "baris": token.baris,
+            }
+
+        berkurung = self._cocok_saja("(")
+        daftar: list[dict] = []
         while True:
-            n = self._cocokkan("NAMA").nilai
-            a = None
-            if self._adalah("as"):
+            nama = self._ambil_nama()
+            alias = None
+            if self._adalah_alias():
                 self._maju()
-                a = self._cocokkan("NAMA").nilai
-            nama_list.append({"nama": n, "alias": a})
-            if self._adalah(","):
+                alias = self._ambil_nama()
+            daftar.append({"nama": nama, "alias": alias})
+            if self._cocok_saja(","):
                 self._maju()
                 self._lewati_baris_baru()
-                if self._adalah(")"):
+                if berkurung and self._cocok_saja(")"):
                     break
-            else:
-                break
-        if dengan_kurung:
-            self._cocokkan(")")
-        self._lewati_baris_baru()
-        return {"jenis": "DariImpor", "modul": modul, "nama": nama_list}
+                continue
+            break
+        if berkurung:
+            self._cocok(")")
+        return {"jenis": "DariImpor", "modul": modul, "nama": daftar, "baris": token.baris}
 
-    def _parse_coba(self) -> Simpul:
-        """Parse: try: blok except Tipe [as nama]: blok [finally: blok]"""
-        self._cocokkan("try")
-        self._cocokkan(":")
-        self._lewati_baris_baru()
-        tubuh = self._parse_blok_indented()
+    def _urai_coba(self) -> Simpul:
+        """Urai ``coba / kecuali / lainnya / akhirnya``."""
+        token = self._cocok("try")
+        self._cocok(":")
+        tubuh = self._urai_blok_indent()
 
         handler: list[Simpul] = []
         self._lewati_baris_baru()
-        while self._adalah("except"):
+        while self._cocok_saja("except"):
             self._maju()
             tipe_exc = None
             nama_exc = None
-            if not self._adalah(":"):
-                tipe_exc = self._parse_ekspresi()
-                if self._adalah("as"):
+            if not self._cocok_saja(":"):
+                tipe_exc = self._urai_ekspresi()
+                if self._adalah_alias():
                     self._maju()
-                    nama_exc = self._cocokkan("NAMA").nilai
-            self._cocokkan(":")
-            self._lewati_baris_baru()
-            b = self._parse_blok_indented()
-            handler.append({"tipe": tipe_exc, "nama": nama_exc, "tubuh": b})
+                    nama_exc = self._ambil_nama()
+            self._cocok(":")
+            handler.append({"tipe": tipe_exc, "nama": nama_exc, "tubuh": self._urai_blok_indent()})
             self._lewati_baris_baru()
 
         else_blok: list[Simpul] = []
-        if self._adalah("else"):
-            self._maju(); self._cocokkan(":")
-            self._lewati_baris_baru()
-            else_blok = self._parse_blok_indented()
+        if self._cocok_saja("else"):
+            self._maju()
+            self._cocok(":")
+            else_blok = self._urai_blok_indent()
             self._lewati_baris_baru()
 
         finally_blok: list[Simpul] = []
-        if self._adalah("finally"):
-            self._maju(); self._cocokkan(":")
-            self._lewati_baris_baru()
-            finally_blok = self._parse_blok_indented()
+        if self._cocok_saja("finally"):
+            self._maju()
+            self._cocok(":")
+            finally_blok = self._urai_blok_indent()
 
         return {
             "jenis": "CobaDanKecuali",
@@ -454,392 +745,575 @@ class Parser:
             "handler": handler,
             "else": else_blok,
             "finally": finally_blok,
+            "baris": token.baris,
         }
 
-    def _parse_hapus(self) -> Simpul:
-        self._cocokkan("del")
-        target = self._parse_ekspresi()
-        self._lewati_baris_baru()
-        return {"jenis": "Hapus", "target": target}
+    def _urai_hapus(self) -> Simpul:
+        """Urai ``hapus target``."""
+        token = self._cocok("del")
+        target = self._urai_ekspresi_dengan_koma()
+        return {"jenis": "Hapus", "target": target, "baris": token.baris}
 
-    def _parse_global(self) -> Simpul:
-        self._cocokkan("global")
-        nama = [self._cocokkan("NAMA").nilai]
-        while self._adalah(","):
-            self._maju()
-            nama.append(self._cocokkan("NAMA").nilai)
-        self._lewati_baris_baru()
-        return {"jenis": "Global", "nama": nama}
+    def _urai_global(self) -> Simpul:
+        """Urai ``global a, b``."""
+        token = self._cocok("global")
+        nama = [self._ambil_nama()]
+        while self._cocok_maka(","):
+            nama.append(self._ambil_nama())
+        return {"jenis": "Global", "nama": nama, "baris": token.baris}
 
-    def _parse_nonlokal(self) -> Simpul:
-        self._cocokkan("nonlocal")
-        nama = [self._cocokkan("NAMA").nilai]
-        while self._adalah(","):
-            self._maju()
-            nama.append(self._cocokkan("NAMA").nilai)
-        self._lewati_baris_baru()
-        return {"jenis": "Nonlokal", "nama": nama}
+    def _urai_nonlokal(self) -> Simpul:
+        """Urai ``nonlokal a, b``."""
+        token = self._cocok("nonlocal")
+        nama = [self._ambil_nama()]
+        while self._cocok_maka(","):
+            nama.append(self._ambil_nama())
+        return {"jenis": "Nonlokal", "nama": nama, "baris": token.baris}
 
-    def _parse_assert(self) -> Simpul:
-        self._cocokkan("assert")
-        kondisi = self._parse_ekspresi()
+    def _urai_pernyataan_kondisi(self) -> Simpul:
+        """Urai ``pernyataan kondisi [pesan]`` (padanan ``assert``)."""
+        token = self._cocok("assert")
+        kondisi = self._urai_ekspresi()
         pesan = None
-        if self._adalah(","):
+        if self._cocok_saja(","):
             self._maju()
-            pesan = self._parse_ekspresi()
-        self._lewati_baris_baru()
-        return {"jenis": "Assert", "kondisi": kondisi, "pesan": pesan}
+            pesan = self._urai_ekspresi()
+        return {"jenis": "Assert", "kondisi": kondisi, "pesan": pesan, "baris": token.baris}
 
-    def _parse_naikkan(self) -> Simpul:
-        self._cocokkan("raise")
-        if self._adalah("BARIS_BARU") or self._adalah_eof():
-            return {"jenis": "Naikkan", "ekspresi": None}
-        ekspresi = self._parse_ekspresi()
-        self._lewati_baris_baru()
-        return {"jenis": "Naikkan", "ekspresi": ekspresi}
-
-    def _parse_bersama(self) -> Simpul:
-        self._cocokkan("with")
-        konteks = self._parse_ekspresi()
-        nama = None
-        if self._adalah("as"):
-            self._maju()
-            nama = self._cocokkan("NAMA").nilai
-        self._cocokkan(":")
-        self._lewati_baris_baru()
-        tubuh = self._parse_blok_indented()
-        return {"jenis": "Bersama", "konteks": konteks, "nama": nama, "tubuh": tubuh}
-
-    # ── Parsing ekspresi (precedence climbing) ────────────────────────────────
-
-    def _parse_ekspresi(self) -> Simpul:
-        if self._adalah("lambda"):
-            return self._parse_lambda()
-        return self._parse_ekspresi_kondisional()
-
-    def _parse_lambda(self) -> Simpul:
-        self._cocokkan("lambda")
-        params: list[str] = []
-        while not self._adalah(":") and not self._adalah_eof():
-            if self._saat_ini().tipe == TipeToken.NAMA:
-                params.append(self._maju().nilai)
-            if self._adalah(","):
+    def _urai_naikkan(self) -> Simpul:
+        """Urai ``naikkan [ekspresi]`` atau ``naikkan … dari …``."""
+        token = self._cocok("raise")
+        ekspresi = None
+        penyebab = None
+        if not self._di_akhir_baris():
+            ekspresi = self._urai_ekspresi()
+            if self._cocok_saja("from"):
                 self._maju()
-        self._cocokkan(":")
-        tubuh = self._parse_ekspresi()
-        return {"jenis": "Lambda", "parameter": params, "tubuh": tubuh}
+                penyebab = self._urai_ekspresi()
+        return {"jenis": "Naikkan", "ekspresi": ekspresi, "dari": penyebab, "baris": token.baris}
 
-    def _parse_ekspresi_kondisional(self) -> Simpul:
-        """ekspresi [if kondisi else alternatif]"""
-        kiri = self._parse_or()
-        if self._adalah("if"):
-            self._maju()
-            kondisi = self._parse_or()
-            self._cocokkan("else")
-            kanan = self._parse_ekspresi_kondisional()
-            return {"jenis": "EkspresiKondisi", "nilai": kiri, "kondisi": kondisi, "alternatif": kanan}
-        return kiri
+    def _urai_bersama(self) -> Simpul:
+        """Urai ``bersama konteks [sebagai nama]`` (dapat berkoma)."""
+        token = self._cocok("with")
+        item: list[Simpul] = []
 
-    def _parse_or(self) -> Simpul:
-        kiri = self._parse_and()
-        while self._adalah("or"):
-            op = self._maju().nilai
-            kanan = self._parse_and()
-            kiri = {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
-        return kiri
-
-    def _parse_and(self) -> Simpul:
-        kiri = self._parse_not()
-        while self._adalah("and"):
-            op = self._maju().nilai
-            kanan = self._parse_not()
-            kiri = {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
-        return kiri
-
-    def _parse_not(self) -> Simpul:
-        if self._adalah("not"):
-            op = self._maju().nilai
-            return {"jenis": "UnOp", "op": op, "operand": self._parse_not()}
-        return self._parse_perbandingan()
-
-    def _parse_perbandingan(self) -> Simpul:
-        kiri = self._parse_bitor()
-        OP_PERB = {"==", "!=", "<", ">", "<=", ">="}
         while True:
-            tok = self._saat_ini()
-            if tok.nilai in OP_PERB:
-                op = self._maju().nilai
-            elif tok.nilai == "not" and self._intip(1).nilai == "in":
-                self._maju(); self._maju(); op = "not in"
-            elif tok.nilai == "is" and self._intip(1).nilai == "not":
-                self._maju(); self._maju(); op = "is not"
-            elif tok.nilai in ("in", "is"):
-                op = self._maju().nilai
+            konteks = self._urai_ekspresi()
+            nama = None
+            if self._adalah_alias():
+                self._maju()
+                nama = self._ambil_nama()
+            item.append({"konteks": konteks, "nama": nama})
+            if self._cocok_saja(","):
+                self._maju()
+                continue
+            break
+
+        self._cocok(":")
+        return {
+            "jenis": "Bersama",
+            "item": item,
+            "tubuh": self._urai_blok_indent(),
+            "baris": token.baris,
+        }
+
+    def _urai_cocok_pola(self) -> Simpul:
+        """Urai pernyataan ``match`` — memakai padanan Python apa adanya."""
+        # Guest: 'match' tetap dieksekusi Python, jadi cukup teruskan.
+        token = self._cocok("match")
+        subjek = self._urai_ekspresi()
+        self._cocok(":")
+        return {"jenis": "CocokPola", "subjek": subjek, "tubuh": [], "baris": token.baris}
+
+    # ── Ekspresi (descend rekursif mengikuti presedensi Python) ────────────────
+
+    def _urai_ekspresi(self) -> Simpul:
+        """Ekspresi paling atas: lambda, penghasil, atau ekspresi kondisi."""
+        if self._cocok_saja("lambda"):
+            return self._urai_lambda()
+        if self._cocok_saja("yield", "yield_dari"):
+            return self._urai_hasil()
+        return self._urai_kondisional()
+
+    def _urai_hasil(self) -> Simpul:
+        """
+        Urai ``hasilkan nilai`` dan ``hasilkan_dari iterable``.
+
+        Padanan Python-nya ``yield`` / ``yield from``.
+        """
+        token = self._saat_ini()
+        dari = str(token.teks_asli) == "hasilkan_dari" or bool(self._cocok_saja("from"))
+        self._maju()
+        nilai = None
+        if not self._di_akhir_baris() and not self._cocok_saja(")"):
+            nilai = self._urai_ekspresi_dengan_koma()
+        return {
+            "jenis": "Hasil",
+            "nilai": nilai,
+            "dari": dari,
+            "baris": token.baris,
+        }
+
+    def _urai_lambda(self) -> Simpul:
+        """Urai ``lambda params: ekspresi``."""
+        token = self._cocok("lambda")
+        parameter: list[Simpul] = []
+        while not self._cocok_saja(":") and self._saat_ini().tipe is not TipeToken.EOF:
+            if self._bisa_jadi_nama():
+                parameter.append({"nama": self._ambil_nama(), "posisi": "positional"})
+            elif self._cocok_saja("*"):
+                self._maju()
+                parameter.append({"nama": self._ambil_nama(), "posisi": "kwonly", "bintang": "*"})
+            elif self._cocok_saja("**"):
+                self._maju()
+                parameter.append({"nama": self._ambil_nama(), "posisi": "positional", "bintang": "**"})
+            if self._cocok_maka(","):
+                continue
+            break
+        self._cocok(":")
+        return {"jenis": "Lambda", "parameter": parameter, "tubuh": self._urai_ekspresi(), "baris": token.baris}
+
+    def _urai_kondisional(self) -> Simpul:
+        """Urai ``nilai jika kondisi lainnya alternatif``."""
+        nilai = self._urai_atau()
+        if self._cocok_saja("if"):
+            self._maju()
+            kondisi = self._urai_atau()
+            if self._cocok_saja("else"):
+                self._maju()
+                alternatif = self._urai_kondisional()
             else:
-                break
-            kanan = self._parse_bitor()
-            kiri = {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
+                raise err_kata_kunci_sebagai_nama("else", self._saat_ini().baris, self._saat_ini().kolom, **self._sumber_kw)
+            return {
+                "jenis": "EkspresiKondisi",
+                "nilai": nilai,
+                "kondisi": kondisi,
+                "alternatif": alternatif,
+            }
+        return nilai
+
+    def _urai_atau(self) -> Simpul:
+        kiri = self._urai_dan()
+        while self._cocok_saja("or"):
+            operator = str(self._maju().nilai)
+            kanan = self._urai_dan()
+            kiri = {"jenis": "BinOp", "op": operator, "kiri": kiri, "kanan": kanan}
         return kiri
 
-    def _parse_bitor(self) -> Simpul:
-        kiri = self._parse_bitxor()
-        while self._saat_ini().tipe == TipeToken.OP and self._saat_ini().nilai == "|":
-            op = self._maju().nilai
-            kanan = self._parse_bitxor()
-            kiri = {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
+    def _urai_dan(self) -> Simpul:
+        kiri = self._urai_bukan()
+        while self._cocok_saja("and"):
+            operator = str(self._maju().nilai)
+            kanan = self._urai_bukan()
+            kiri = {"jenis": "BinOp", "op": operator, "kiri": kiri, "kanan": kanan}
         return kiri
 
-    def _parse_bitxor(self) -> Simpul:
-        kiri = self._parse_bitand()
-        while self._saat_ini().tipe == TipeToken.OP and self._saat_ini().nilai == "^":
-            op = self._maju().nilai
-            kanan = self._parse_bitand()
-            kiri = {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
-        return kiri
+    def _urai_bukan(self) -> Simpul:
+        """Urai operator logika unary ``bukan``/``not``."""
+        if self._cocok_saja("not"):
+            operator = str(self._maju().nilai)
+            return {"jenis": "UnOp", "op": operator, "operand": self._urai_bukan()}
+        return self._urai_perbandingan()
 
-    def _parse_bitand(self) -> Simpul:
-        kiri = self._parse_shift()
-        while self._saat_ini().tipe == TipeToken.OP and self._saat_ini().nilai == "&":
-            op = self._maju().nilai
-            kanan = self._parse_shift()
-            kiri = {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
-        return kiri
-
-    def _parse_shift(self) -> Simpul:
-        kiri = self._parse_penjumlahan()
-        while self._saat_ini().tipe == TipeToken.OP and self._saat_ini().nilai in ("<<", ">>"):
-            op = self._maju().nilai
-            kanan = self._parse_penjumlahan()
-            kiri = {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
-        return kiri
-
-    def _parse_penjumlahan(self) -> Simpul:
-        kiri = self._parse_perkalian()
-        while self._saat_ini().tipe == TipeToken.OP and self._saat_ini().nilai in ("+", "-"):
-            op = self._maju().nilai
-            kanan = self._parse_perkalian()
-            kiri = {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
-        return kiri
-
-    def _parse_perkalian(self) -> Simpul:
-        kiri = self._parse_eksponen()
-        while self._saat_ini().tipe == TipeToken.OP and self._saat_ini().nilai in ("*", "/", "//", "%", "@"):
-            op = self._maju().nilai
-            kanan = self._parse_eksponen()
-            kiri = {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
-        return kiri
-
-    def _parse_eksponen(self) -> Simpul:
+    def _urai_perbandingan(self) -> Simpul:
         """
-        Pangkat bersifat right-associative: 2**3**2 == 2**(3**2) == 512.
-        Karena itu sisi kanan diparsing secara rekursif dengan _parse_eksponen(),
-        bukan _parse_unary() — perbedaan ini krusial untuk chaining yang benar.
+        Urai perbandingan, termasuk *chaining* ``a < b <= c``.
+
+        Rantai disimpan sebagai :data:`PerbandinganRantai` berisi operand
+        pertama lalu tiap pasangan ``(op, operand)``. Transpiler akan
+        membangkitkan ulang bentuk ``a < b <= c`` yang ekuivalen secara
+        semantik dengan Python (operand tengah dievaluasi satu kali).
         """
-        kiri = self._parse_unary()
-        if self._saat_ini().tipe == TipeToken.OP and self._saat_ini().nilai == "**":
-            op = self._maju().nilai
-            kanan = self._parse_eksponen()   # rekursif agar right-associative
-            return {"jenis": "BinOp", "op": op, "kiri": kiri, "kanan": kanan}
-        return kiri
+        operand_pertama = self._urai_bitor()
+        segmen: list[Simpul] = []
 
-    def _parse_unary(self) -> Simpul:
-        if self._saat_ini().tipe == TipeToken.OP and self._saat_ini().nilai in ("-", "+", "~"):
-            op = self._maju().nilai
-            return {"jenis": "UnOp", "op": op, "operand": self._parse_unary()}
-        return self._parse_postfix()
-
-    def _parse_postfix(self) -> Simpul:
-        """Akses atribut, subskrip, dan pemanggilan fungsi."""
-        simpul = self._parse_atom()
         while True:
-            tok = self._saat_ini()
-            if tok.nilai == ".":
+            token = self._saat_ini()
+            operator = self._baca_operator_perbandingan()
+            if operator is None:
+                break
+            segmen.append({
+                "op": operator,
+                "kanan": self._urai_bitor(),
+                "baris": token.baris,
+            })
+
+        if not segmen:
+            return operand_pertama
+
+        return {
+            "jenis": "PerbandinganRantai",
+            "awal": operand_pertama,
+            "segmen": segmen,
+            "baris": segmen[0]["baris"],
+        }
+
+    def _baca_operator_perbandingan(self) -> str | None:
+        """Baca satu operator perbandingan (termasuk ``not in``/``is not``)."""
+        token = self._saat_ini()
+        if token.tipe is TipeToken.OP and token.nilai in ("==", "!=", "<", ">", "<=", ">="):
+            self._maju()
+            return str(token.nilai)
+        if token.nilai == "not" and self._intip(1).nilai == "in":
+            self._maju()
+            self._maju()
+            return "not in"
+        if token.nilai == "is" and self._intip(1).nilai == "not":
+            self._maju()
+            self._maju()
+            return "is not"
+        if token.nilai in ("in", "is"):
+            self._maju()
+            return str(token.nilai)
+        if token.tipe is TipeToken.OP and token.nilai == ":":
+            return None
+        return None
+
+    def _urai_bitor(self) -> Simpul:
+        kiri = self._urai_bitxor()
+        while self._cocok_op("|"):
+            operator = str(self._maju().nilai)
+            kanan = self._urai_bitxor()
+            kiri = {"jenis": "BinOp", "op": operator, "kiri": kiri, "kanan": kanan}
+        return kiri
+
+    def _urai_bitxor(self) -> Simpul:
+        kiri = self._urai_bitand()
+        while self._cocok_op("^"):
+            operator = str(self._maju().nilai)
+            kanan = self._urai_bitand()
+            kiri = {"jenis": "BinOp", "op": operator, "kiri": kiri, "kanan": kanan}
+        return kiri
+
+    def _urai_bitand(self) -> Simpul:
+        kiri = self._urai_geseran()
+        while self._cocok_op("&"):
+            operator = str(self._maju().nilai)
+            kanan = self._urai_geseran()
+            kiri = {"jenis": "BinOp", "op": operator, "kiri": kiri, "kanan": kanan}
+        return kiri
+
+    def _urai_geseran(self) -> Simpul:
+        kiri = self._urai_penjumlahan()
+        while self._cocok_op("<<", ">>"):
+            operator = str(self._maju().nilai)
+            kanan = self._urai_penjumlahan()
+            kiri = {"jenis": "BinOp", "op": operator, "kiri": kiri, "kanan": kanan}
+        return kiri
+
+    def _urai_penjumlahan(self) -> Simpul:
+        kiri = self._urai_perkalian()
+        while self._cocok_op("+", "-"):
+            operator = str(self._maju().nilai)
+            kanan = self._urai_perkalian()
+            kiri = {"jenis": "BinOp", "op": operator, "kiri": kiri, "kanan": kanan}
+        return kiri
+
+    def _urai_perkalian(self) -> Simpul:
+        kiri = self._urai_eksponen()
+        while self._cocok_op("*", "/", "//", "%", "@"):
+            operator = str(self._maju().nilai)
+            kanan = self._urai_eksponen()
+            kiri = {"jenis": "BinOp", "op": operator, "kiri": kiri, "kanan": kanan}
+        return kiri
+
+    def _cocok_op(self, *nilai: str) -> bool:
+        """True bila token saat ini adalah OP dengan salah satu nilai."""
+        token = self._saat_ini()
+        return token.tipe is TipeToken.OP and str(token.nilai) in nilai
+
+    def _urai_eksponen(self) -> Simpul:
+        """
+        Pangkat: right-associative (``2**3**2`` = ``2**(3**2)``).
+
+        Sisi kanan diparsing rekursif dengan :meth:`_urai_eksponen`.
+        """
+        kiri = self._urai_unary()
+        if self._cocok_op("**"):
+            operator = str(self._maju().nilai)
+            kanan = self._urai_eksponen()
+            return {"jenis": "BinOp", "op": operator, "kiri": kiri, "kanan": kanan}
+        return kiri
+
+    def _urai_unary(self) -> Simpul:
+        """Urai operator unary ``-``, ``+``, ``~``, ``bukan``, ``tunggu``."""
+        token = self._saat_ini()
+        if self._cocok_op("-", "+", "~"):
+            operator = str(self._maju().nilai)
+            return {"jenis": "UnOp", "op": operator, "operand": self._urai_unary()}
+        if self._cocok_saja("await"):
+            self._maju()
+            return {"jenis": "Tunggu", "operand": self._urai_unary()}
+        return self._urai_postfix()
+
+    def _urai_postfix(self) -> Simpul:
+        """Urai subscript, slicing, pemanggilan, dan akses atribut."""
+        simpul = self._urai_atom()
+        while True:
+            token = self._saat_ini()
+
+            if token.tipe is TipeToken.DELIMITER and token.nilai == ".":
                 self._maju()
-                attr = self._ambil_ident()   # metode/atribut bisa bernama keyword
-                simpul = {"jenis": "Atribut", "objek": simpul, "atribut": attr}
-            elif tok.nilai == "[":
+                atribut = self._ambil_nama(teks=True)
+                simpul = {"jenis": "Atribut", "objek": simpul, "atribut": atribut}
+                continue
+
+            if token.tipe is TipeToken.DELIMITER and token.nilai == "[":
                 self._maju()
-                indeks = self._parse_ekspresi()
-                if self._adalah(":"):
-                    self._maju()
-                    akhir = None if self._adalah("]") else self._parse_ekspresi()
-                    langkah = None
-                    if self._adalah(":"):
-                        self._maju()
-                        langkah = None if self._adalah("]") else self._parse_ekspresi()
-                    self._cocokkan("]")
-                    simpul = {"jenis": "Slice", "objek": simpul, "awal": indeks, "akhir": akhir, "langkah": langkah}
-                else:
-                    self._cocokkan("]")
-                    simpul = {"jenis": "Subskrip", "objek": simpul, "indeks": indeks}
-            elif tok.nilai == "(":
-                argumen = self._parse_argumen()
+                simpul = self._urai_indeks(simpul)
+                continue
+
+            if token.tipe is TipeToken.DELIMITER and token.nilai == "(":
+                argumen = self._urai_argumen()
                 simpul = {"jenis": "Panggilan", "fungsi": simpul, "argumen": argumen}
-            else:
-                break
+                continue
+
+            break
         return simpul
 
-    def _parse_argumen(self) -> list[Simpul]:
-        """Parse daftar argumen: positional, keyword, *args, **kwargs."""
-        self._cocokkan("(")
-        args: list[Simpul] = []
-        while not self._adalah(")") and not self._adalah_eof():
-            if self._adalah("**"):
+    def _urai_indeks(self, objek: Simpul) -> Simpul:
+        """Urai ``[indeks]`` atau ``[awal:akhir:langkah]`` (boleh kosong)."""
+        awal = self._urai_slice_awal()
+        if not self._cocok_saja(":"):
+            self._cocok("]")
+            return {"jenis": "Subskrip", "objek": objek, "indeks": awal}
+
+        self._maju()
+        akhir = None
+        if not self._cocok_saja(":") and not self._cocok_saja("]"):
+            akhir = self._urai_ekspresi()
+        langkah = None
+        if self._cocok_maka(":"):
+            if not self._cocok_saja("]"):
+                langkah = self._urai_ekspresi()
+        self._cocok("]")
+        return {
+            "jenis": "Slice",
+            "objek": objek,
+            "awal": awal,
+            "akhir": akhir,
+            "langkah": langkah,
+        }
+
+    def _urai_slice_awal(self) -> Simpul:
+        """Urai bagian sebelum tanda ``:`` pada indeks/slice."""
+        if self._cocok_saja("]") or self._cocok_saja(":"):
+            return {"jenis": "Kosong"}
+        return self._urai_ekspresi()
+
+    def _urai_argumen(self) -> list[Simpul]:
+        """Urai daftar argumen: posisional, kunci, ``*args``, ``**kwargs``."""
+        self._cocok("(")
+        argumen: list[Simpul] = []
+        while not self._cocok_saja(")") and self._saat_ini().tipe is not TipeToken.EOF:
+            if self._cocok_saja("**"):
                 self._maju()
-                args.append({"jenis": "KwargsUnpack", "nilai": self._parse_ekspresi()})
-            elif self._adalah("*"):
+                argumen.append({"jenis": "KwargsUnpack", "nilai": self._urai_ekspresi()})
+            elif self._cocok_saja("*"):
                 self._maju()
-                args.append({"jenis": "ArgsUnpack", "nilai": self._parse_ekspresi()})
-            elif (self._saat_ini().tipe == TipeToken.NAMA
-                  and self._intip(1).nilai == "="
-                  and self._intip(1).tipe == TipeToken.OP):
-                nama = self._maju().nilai
-                self._cocokkan("=")
-                nilai = self._parse_ekspresi()
-                args.append({"jenis": "ArgKunci", "nama": nama, "nilai": nilai})
+                argumen.append({"jenis": "ArgsUnpack", "nilai": self._urai_ekspresi()})
+            elif self._cocok_saja(":="):
+                self._maju()
+                target = self._uri_nama_target()
+                argumen.append({"jenis": "PenugasanEkspresi", "target": target, "nilai": self._urai_ekspresi()})
+            elif self._bisa_jadi_nama() and self._intip(1).tipe is TipeToken.OP \
+                    and self._intip(1).nilai == "=":
+                nama = self._ambil_nama()
+                self._cocok("=")
+                argumen.append({"jenis": "ArgKunci", "nama": nama, "nilai": self._urai_ekspresi()})
             else:
-                args.append(self._parse_ekspresi())
-            if self._adalah(","):
-                self._maju()
-            else:
-                break
-        self._cocokkan(")")
-        return args
+                argumen.append(self._urai_ekspresi())
+            if self._cocok_maka(","):
+                continue
+            break
+        self._cocok(")")
+        return argumen
 
-    def _parse_atom(self) -> Simpul:
-        """Nilai atom: literal, nama, list, dict, tuple, set."""
-        tok = self._saat_ini()
+    def _uri_nama_target(self) -> Simpul:
+        """Ambil satu nama untuk target ``:=``."""
+        nama = self._ambil_nama()
+        return {"jenis": "Nama", "nama": nama}
 
-        if tok.tipe == TipeToken.ANGKA:
+    def _urai_atom(self) -> Simpul:
+        """Urai nilai atom: literal, nama, list, dict, set, tuple."""
+        token = self._saat_ini()
+        tipe = token.tipe
+
+        if tipe is TipeToken.ANGKA:
             self._maju()
-            return {"jenis": "Angka", "nilai": tok.nilai}
+            return {
+                "jenis": "Angka",
+                "nilai": token.nilai,
+                "source": str(token.teks_asli),
+            }
 
-        if tok.tipe == TipeToken.TEKS:
+        if tipe is TipeToken.TEKS:
             self._maju()
-            return {"jenis": "Teks", "nilai": tok.nilai}
+            return {"jenis": "Teks", "nilai": str(token.teks_asli)}
 
-        if tok.tipe == TipeToken.BENAR:
-            self._maju(); return {"jenis": "Boolean", "nilai": True}
-
-        if tok.tipe == TipeToken.SALAH:
-            self._maju(); return {"jenis": "Boolean", "nilai": False}
-
-        if tok.tipe == TipeToken.KOSONG:
-            self._maju(); return {"jenis": "Kosong"}
-
-        if tok.tipe in (TipeToken.NAMA, TipeToken.KATA_KUNCI):
+        if tipe is TipeToken.BENAR:
             self._maju()
-            return {"jenis": "Nama", "nama": tok.nilai}
+            return {"jenis": "Boolean", "nilai": True}
 
-        # Ekspresi dalam kurung atau tuple
-        if tok.nilai == "(":
+        if tipe is TipeToken.SALAH:
             self._maju()
-            if self._adalah(")"):
-                self._maju()
-                return {"jenis": "Tuple", "elemen": []}
-            ekspresi = self._parse_ekspresi()
-            if self._adalah("for"):
-                komp = self._parse_comprehension_tail()
-                self._cocokkan(")")
-                return {"jenis": "GeneratorEkspresi", "ekspresi": ekspresi, "comprehension": komp}
-            if self._adalah(","):
-                elemen = [ekspresi]
-                while self._adalah(","):
-                    self._maju()
-                    if self._adalah(")"):
-                        break
-                    elemen.append(self._parse_ekspresi())
-                self._cocokkan(")")
-                return {"jenis": "Tuple", "elemen": elemen}
-            self._cocokkan(")")
-            return ekspresi
+            return {"jenis": "Boolean", "nilai": False}
 
-        # List atau list comprehension
-        if tok.nilai == "[":
+        if tipe is TipeToken.KOSONG:
             self._maju()
-            if self._adalah("]"):
-                self._maju()
-                return {"jenis": "Daftar", "elemen": []}
-            pertama = self._parse_ekspresi()
-            if self._adalah("for"):
-                komp = self._parse_comprehension_tail()
-                self._cocokkan("]")
-                return {"jenis": "ListComprehension", "ekspresi": pertama, "comprehension": komp}
+            return {"jenis": "Kosong"}
+
+        if self._bisa_jadi_nama(token):
+            self._maju()
+            return {"jenis": "Nama", "nama": str(token.teks_asli if token.teks_asli else token.nilai)}
+
+        if tipe is TipeToken.DELIMITER and token.nilai == "(":
+            return self._urai_kurung()
+        if tipe is TipeToken.DELIMITER and token.nilai == "[":
+            return self._urai_daftar()
+        if tipe is TipeToken.DELIMITER and token.nilai == "{":
+            return self._urai_kamus_himpunan()
+        if tipe is TipeToken.OP and token.nilai == "*":
+            self._maju()
+            return {"jenis": "ArgsUnpack", "nilai": self._urai_ekspresi()}
+
+        if tipe is TipeToken.OP and token.nilai == "...":
+            self._maju()
+            return {"jenis": "Elipsis"}
+
+        raise err_ekspresi_diharapkan(
+            self._label(token), token.baris, token.kolom, **self._sumber_kw
+        )
+
+    def _urai_kurung(self) -> Simpul:
+        """Urai kurung: grup, tuple, atau generator ekspresi."""
+        self._cocok("(")
+        if self._cocok_maka(")"):
+            return {"jenis": "Tuple", "elemen": []}
+        # Bentuk walrus: (nama := nilai)
+        if self._bisa_jadi_nama() and self._intip(1).tipe is TipeToken.OP \
+                and self._intip(1).nilai == ":=":
+            nama = self._ambil_nama()
+            self._cocok(":=")
+            nilai = self._urai_ekspresi()
+            self._cocok(")")
+            return {
+                "jenis": "PenugasanEkspresi",
+                "target": {"jenis": "Nama", "nama": nama},
+                "nilai": nilai,
+            }
+        pertama = self._urai_ekspresi()
+        if self._cocok_saja("for"):
+            komp = self._urai_comprehension()
+            self._cocok(")")
+            return {"jenis": "GeneratorEkspresi", "ekspresi": pertama, "comprehension": komp}
+        if self._cocok_maka(","):
             elemen = [pertama]
-            while self._adalah(","):
-                self._maju()
-                if self._adalah("]"):
+            while True:
+                if self._cocok_saja(")"):
                     break
-                elemen.append(self._parse_ekspresi())
-            self._cocokkan("]")
-            return {"jenis": "Daftar", "elemen": elemen}
+                elemen.append(self._urai_ekspresi())
+                if not self._cocok_maka(","):
+                    break
+            self._cocok(")")
+            return {"jenis": "Tuple", "elemen": elemen}
+        self._cocok(")")
+        # Tandai kurung eksplisit: affects exponent sign, slices, etc.
+        if pertama.get("jenis") in ("UnOp", "BinOp", "Tunggu", "PerbandinganRantai"):
+            pertama = dict(pertama)
+            pertama["dalam_kurung"] = True
+        return pertama
 
-        # Dict atau set literal
-        if tok.nilai == "{":
+    def _urai_daftar(self) -> Simpul:
+        """Urai list literal atau list comprehension."""
+        self._cocok("[")
+        if self._cocok_maka("]"):
+            return {"jenis": "Daftar", "elemen": []}
+        pertama = self._urai_ekspresi()
+        if self._cocok_saja("for"):
+            komp = self._urai_comprehension()
+            self._cocok("]")
+            return {"jenis": "ListComprehension", "ekspresi": pertama, "comprehension": komp}
+        elemen = [pertama]
+        while self._cocok_maka(","):
+            if self._cocok_saja("]"):
+                break
+            elemen.append(self._urai_ekspresi())
+        self._cocok("]")
+        return {"jenis": "Daftar", "elemen": elemen}
+
+    def _urai_kamus_himpunan(self) -> Simpul:
+        """Urai dict/set literal atau comprehension-nya."""
+        self._cocok("{")
+        if self._cocok_maka("}"):
+            return {"jenis": "Kamus", "pasang": []}
+        pertama = self._urai_ekspresi()
+        if self._cocok_saja(":"):
             self._maju()
-            if self._adalah("}"):
-                self._maju()
-                return {"jenis": "Kamus", "pasang": []}
-            pertama = self._parse_ekspresi()
-            if self._adalah(":"):
-                # Dict
-                self._maju()
-                nilai_pertama = self._parse_ekspresi()
-                if self._adalah("for"):
-                    komp = self._parse_comprehension_tail()
-                    self._cocokkan("}")
-                    return {"jenis": "DictComprehension", "kunci": pertama, "nilai": nilai_pertama, "comprehension": komp}
-                pasang = [(pertama, nilai_pertama)]
-                while self._adalah(","):
-                    self._maju()
-                    if self._adalah("}"):
-                        break
-                    k = self._parse_ekspresi()
-                    self._cocokkan(":")
-                    v = self._parse_ekspresi()
-                    pasang.append((k, v))
-                self._cocokkan("}")
-                return {"jenis": "Kamus", "pasang": pasang}
-            else:
-                # Set
-                elemen = [pertama]
-                while self._adalah(","):
-                    self._maju()
-                    if self._adalah("}"):
-                        break
-                    elemen.append(self._parse_ekspresi())
-                self._cocokkan("}")
-                return {"jenis": "Himpunan", "elemen": elemen}
+            nilai = self._urai_ekspresi()
+            if self._cocok_saja("for"):
+                komp = self._urai_comprehension()
+                self._cocok("}")
+                return {
+                    "jenis": "DictComprehension",
+                    "kunci": pertama,
+                    "nilai": nilai,
+                    "comprehension": komp,
+                }
+            pasang = [(pertama, nilai)]
+            while self._cocok_maka(","):
+                if self._cocok_saja("}"):
+                    break
+                k = self._urai_ekspresi()
+                self._cocok(":")
+                v = self._urai_ekspresi()
+                pasang.append((k, v))
+            self._cocok("}")
+            return {"jenis": "Kamus", "pasang": pasang}
+        # Set
+        elemen = [pertama]
+        while self._cocok_maka(","):
+            if self._cocok_saja("}"):
+                break
+            elemen.append(self._urai_ekspresi())
+        self._cocok("}")
+        return {"jenis": "Himpunan", "elemen": elemen}
 
-        raise err_ekspresi_diharapkan(str(tok.nilai), tok.baris, tok.kolom)
-
-    def _parse_comprehension_tail(self) -> list[Simpul]:
-        """Parse ekor comprehension: for x in xs [if kondisi]"""
+    def _urai_comprehension(self) -> list[Simpul]:
+        """Urai ekor comprehension: ``untuk x dalam xs [jika kondisi]``."""
         komp: list[Simpul] = []
-        while self._adalah("for"):
+        while self._cocok_saja("for"):
             self._maju()
-            target = self._parse_target_for()
-            self._cocokkan("in")
-            iterable = self._parse_or()
+            target = self._urai_target_penugasan()
+            if not (self._cocok_teks_maka("dalam") or self._cocok_maka("in")):
+                token = self._saat_ini()
+                raise err_token_diharapkan(
+                    "'dalam' atau 'in'", self._label(token),
+                    token.baris, token.kolom, **self._sumber_kw,
+                )
+            iterable = self._urai_atau()
             kondisi = None
-            if self._adalah("if"):
-                self._maju()
-                kondisi = self._parse_or()
+            if self._cocok_maka("if"):
+                kondisi = self._urai_atau()
             komp.append({"target": target, "iterable": iterable, "kondisi": kondisi})
         return komp
 
-    def _parse_nama_titik(self) -> str:
-        """Parse nama modul dengan titik: a.b.c"""
-        bagian = [self._cocokkan("NAMA").nilai]
-        while self._adalah("."):
+    def _urai_nama_titik(self) -> str:
+        """Urai nama modul bertitik: ``a.b.c``."""
+        bagian = [self._ambil_nama()]
+        while self._cocok_saja("."):
             self._maju()
-            bagian.append(self._cocokkan("NAMA").nilai)
+            bagian.append(self._ambil_nama())
         return ".".join(bagian)
 
 
-# ── Fungsi utilitas ───────────────────────────────────────────────────────────
+# ── Pintasan tingkat modul ──────────────────────────────────────────────────
 
-def parse(source: str) -> Simpul:
-    """Shortcut: tokenisasi + parse dan kembalikan AST."""
-    tokens = Lexer(source).tokenisasi()
-    return Parser(tokens).parse()
+def urai(source: str, nama_berkas: str | None = None) -> Simpul:
+    """Pintasan: tokenisasi + urai, kembalikan AST modul."""
+    tokens = Lexer(source, nama_berkas).tokenisasi()
+    return Parser(tokens, nama_berkas).urai()
+
+
+#: Alias kompatibilitas ke API Inggris.
+parse = urai

@@ -74,7 +74,6 @@ KATA_KUNCI_KHUSUS: dict[str, str] = {
     "hasilkan_dari": "yield_dari", # konten: 'hasilkan_dari x' -> yield from
 
     # Alias lain yang dipertahankan untuk kompatibilitas
-    "jika_hanya":   "if",          # tidak standar; dipakai sebagai penanda
 }
 
 # Alias lain: 'menjadi' (as) dan 'lewat' (pass) sengaja TIDAK ada di sini
